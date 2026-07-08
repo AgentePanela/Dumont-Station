@@ -28,6 +28,7 @@ using Robust.Shared.Enums;
 using Robust.Shared.Map;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Timing;
+using Content.Client._Dumont.ZLevel;
 
 namespace Content.Client.Parallax;
 
@@ -54,6 +55,10 @@ public sealed class ParallaxOverlay : Overlay
     protected override bool BeforeDraw(in OverlayDrawArgs args)
     {
         if (args.MapId == MapId.Nullspace || _entManager.HasComponent<BiomeComponent>(_mapSystem.GetMapOrInvalid(args.MapId)))
+            return false;
+
+        // Dumont change - Z-levels
+        if (args.Viewport == ZLevelOverlay.ActiveViewport)
             return false;
 
         return true;
