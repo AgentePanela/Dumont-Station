@@ -95,10 +95,10 @@ public sealed class ZLevelSystem : SharedZLevelSystem
 
         _map.SetAmbientLight(newMapId, ComputeAmbient(newComp.BaseAmbientLight, newComp.Depth));
 
-        // the client eye only keeps its own map in PVS, so without this it never learns
-        // about the neighbouring levels and has nothing to render down there.
-        _pvs.AddGlobalOverride(sourceMap);
-        _pvs.AddGlobalOverride(newMapUid);
+        // send just the map entities (not their contents!) so clients can resolve the links;
+        // what's actually on the lower levels arrives via the ZLevelViewSystem proxies
+        _pvs.AddForceSend(sourceMap);
+        _pvs.AddForceSend(newMapUid);
 
         _metaData.SetEntityName(newMapUid, $"Z[{newComp.Depth}] {Name(sourceMap)}");
 

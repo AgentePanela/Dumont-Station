@@ -62,4 +62,19 @@ public sealed partial class GabyCVars
         CVarDef.Create("servercurrency.tokens_per_rotation", 4, CVar.SERVER);
 
     #endregion
+
+    #region Z-Level
+
+    /// <summary>
+    /// Max levels rendered below the current level.
+    /// </summary>
+    public static readonly CVarDef<int> ZLevelMaxViewDepth =
+        CVarDef.Create("zlevel.max_depth", 3, CVar.SERVER | CVar.REPLICATED);
+
+    /// <summary>
+    /// Render resolution of the z-levels past the -1 level.
+    /// </summary>
+    public static readonly CVarDef<float> ZLevelDeepRenderScale =
+        CVarDef.Create("zlevel.deep_render_scale", 1f, CVar.CLIENTONLY | CVar.ARCHIVE);
+    #endregion
 }

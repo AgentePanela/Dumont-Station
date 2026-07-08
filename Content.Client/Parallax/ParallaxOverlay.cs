@@ -58,7 +58,7 @@ public sealed class ParallaxOverlay : Overlay
             return false;
 
         // Dumont change - Z-levels
-        if (args.Viewport == ZLevelOverlay.ActiveViewport)
+        if (ZLevelOverlay.ActiveViewports.Contains(args.Viewport))
             return false;
 
         return true;
