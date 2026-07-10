@@ -34,7 +34,6 @@ public sealed class ZLevelOverlay : Overlay
     public static readonly HashSet<IClydeViewport> ActiveViewports = new();
 
     private int _maxDepth; // how deep down we bother rendering, comes from the zlevel.max_depth cvar
-    private float _deepScale = 1f; // render resolution of the levels past the first, zlevel.deep_render_scale
     private const long MaxCullScanTiles = 4096; // max culling size
 
     // one off-screen render per visible depth
@@ -62,13 +61,6 @@ public sealed class ZLevelOverlay : Overlay
         _xform = _entManager.System<SharedTransformSystem>();
 
         _cfg.OnValueChanged(GabyCVars.ZLevelMaxViewDepth, SetMaxDepth, true);
-        _cfg.OnValueChanged(GabyCVars.ZLevelDeepRenderScale, SetDeepRenderScale, true);
-    }
-
-    private void SetDeepRenderScale(float scale)
-    {
-        // the mismatched-size check in Draw recreates the viewports on the next frame
-        _deepScale = Math.Clamp(scale, 0.1f, 1f);
     }
 
     private void SetMaxDepth(int depth)
@@ -180,13 +172,7 @@ public sealed class ZLevelOverlay : Overlay
         {
             var layer = _layers[i];
 
-            // levels past the first one can render smaller, the heavy tint hides the detail loss
-            var scale = i == 0 ? 1f : _deepScale;
-            var size = new Vector2i(
-                Math.Max(1, (int) (args.Viewport.Size.X * scale)),
-                Math.Max(1, (int) (args.Viewport.Size.Y * scale)));
-
-            if (layer.Viewport == null || layer.Viewport.Size != size)
+            if (layer.Viewport == null || layer.Viewport.Size != args.Viewport.Size)
             {
                 if (layer.Viewport != null)
                 {
@@ -194,7 +180,7 @@ public sealed class ZLevelOverlay : Overlay
                     layer.Viewport.Dispose();
                 }
 
-                layer.Viewport = _clyde.CreateViewport(size, name: $"z-level-below-{i + 1}");
+                layer.Viewport = _clyde.CreateViewport(args.Viewport.Size, name: $"z-level-below-{i + 1}");
                 layer.Viewport.Eye = layer.Eye;
                 layer.Viewport.ClearColor = Color.Transparent;
                 layer.Viewport.AutomaticRender = true;
@@ -218,7 +204,7 @@ public sealed class ZLevelOverlay : Overlay
             layer.Eye.Zoom = currentEye.Zoom;
             layer.Eye.Rotation = currentEye.Rotation;
             layer.Eye.Offset = currentEye.Offset;
-            layer.Viewport.RenderScale = args.Viewport.RenderScale * scale; // re-scale to cover full size
+            layer.Viewport.RenderScale = args.Viewport.RenderScale;
         }
     }
 
@@ -233,7 +219,6 @@ public sealed class ZLevelOverlay : Overlay
     protected override void DisposeBehavior()
     {
         _cfg.UnsubValueChanged(GabyCVars.ZLevelMaxViewDepth, SetMaxDepth);
-        _cfg.UnsubValueChanged(GabyCVars.ZLevelDeepRenderScale, SetDeepRenderScale);
 
         foreach (var layer in _layers)
         {

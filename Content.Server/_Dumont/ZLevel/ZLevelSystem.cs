@@ -1,6 +1,8 @@
 using System.Numerics;
 using Content.Shared._Dumont.ZLevel;
 using Content.Shared.Maps;
+using Content.Shared.Movement.Pulling.Components;
+using Content.Shared.Movement.Pulling.Systems;
 using Content.Shared.Parallax;
 using Robust.Server.GameStates;
 using Robust.Shared.EntitySerialization.Systems;
@@ -20,6 +22,7 @@ public sealed class ZLevelSystem : SharedZLevelSystem
     [Dependency] private readonly ITileDefinitionManager _tileDefs = default!;
     [Dependency] private readonly MapLoaderSystem _loader = default!;
     [Dependency] private readonly MetaDataSystem _metaData = default!;
+    [Dependency] private readonly PullingSystem _pulling = default!;
     [Dependency] private readonly PvsOverrideSystem _pvs = default!;
     [Dependency] private readonly SharedMapSystem _map = default!;
     [Dependency] private readonly SharedTransformSystem _transform = default!;
@@ -109,7 +112,7 @@ public sealed class ZLevelSystem : SharedZLevelSystem
     /// <summary>
     /// Moves an entity one z-level up or down, keeping its world position.
     /// </summary>
-    public bool TryMoveZ(EntityUid entity, bool up, out string error)
+    public bool TryMoveZ(EntityUid entity, bool up, out string error, bool keepPull = false)
     {
         error = string.Empty;
         var xform = Transform(entity);
@@ -127,10 +130,31 @@ public sealed class ZLevelSystem : SharedZLevelSystem
             return false;
         }
 
+        // try stop the pulling
+        if (TryComp<PullableComponent>(entity, out var pullable) && pullable.BeingPulled)
+            _pulling.TryStopPull(entity, pullable, ignoreGrab: true);
+
+        EntityUid? pulled = null;
+        var pulledWorldPos = Vector2.Zero;
+        if (keepPull && TryComp<PullerComponent>(entity, out var puller)
+            && puller.Pulling is { } pulling
+            && TryComp<PullableComponent>(pulling, out var pulledPullable))
+        {
+            pulled = pulling;
+            pulledWorldPos = _transform.GetWorldPosition(pulling); // grab this before we move the puller
+            _pulling.TryStopPull(pulling, pulledPullable, ignoreGrab: true);
+        }
+
         var worldPos = _transform.GetWorldPosition(entity); // try to fix rotation
         var worldRot = _transform.GetWorldRotation(entity);
         _transform.SetMapCoordinates(entity, new MapCoordinates(worldPos, targetMap.MapId));
         _transform.SetWorldRotation(entity, worldRot);
+        if (pulled != null)
+        {
+            _transform.SetMapCoordinates(pulled.Value, new MapCoordinates(pulledWorldPos, targetMap.MapId));
+            _pulling.TryStartPull(entity, pulled.Value);
+        }
+
         return true;
     }
 

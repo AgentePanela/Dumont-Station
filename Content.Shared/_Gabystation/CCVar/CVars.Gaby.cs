@@ -70,11 +70,5 @@ public sealed partial class GabyCVars
     /// </summary>
     public static readonly CVarDef<int> ZLevelMaxViewDepth =
         CVarDef.Create("zlevel.max_depth", 3, CVar.SERVER | CVar.REPLICATED);
-
-    /// <summary>
-    /// Render resolution of the z-levels past the -1 level.
-    /// </summary>
-    public static readonly CVarDef<float> ZLevelDeepRenderScale =
-        CVarDef.Create("zlevel.deep_render_scale", 1f, CVar.CLIENTONLY | CVar.ARCHIVE);
     #endregion
 }

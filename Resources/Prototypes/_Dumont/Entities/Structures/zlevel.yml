@@ -1,0 +1,109 @@
+- type: entity
+  id: BaseZStairs
+  parent: Stairs
+  name: stairs
+  abstract: true
+  components:
+  - type: Stairs
+    up: true
+  - type: StepTrigger
+    requiredTriggeredSpeed: 0
+    intersectRatio: 0.3
+  - type: Physics
+    bodyType: Static
+  - type: Fixtures
+    fixtures:
+      fix1:
+        shape:
+          !type:PhysShapeAabb
+          bounds: "-0.5,-0.5,0.5,0.5"
+        layer:
+        - WallLayer
+        mask:
+        - ItemMask
+        density: 1000
+        hard: false
+
+- type: entity
+  id: ZStairsUp
+  parent: BaseZStairs
+  suffix: Up
+  description: Leads to the level above.
+  components:
+  - type: Stairs
+    up: true
+
+- type: entity
+  id: ZStairsDown
+  parent: ZStairsUp
+  suffix: Down
+  description: Leads to the level below.
+  components:
+  - type: Stairs
+    up: false
+
+- type: entity
+  id: BaseZLadder
+  parent: BaseStructure
+  name: ladder
+  abstract: true
+  components:
+  - type: Ladder
+    up: true
+  - type: Sprite
+    sprite: _Dumont/Structures/ladders.rsi
+    state: ladder_down
+    drawdepth: FloorObjects
+  - type: Damageable
+    damageContainer: StructuralInorganic
+    damageModifierSet: Metallic
+  - type: Destructible
+    thresholds:
+    - trigger:
+        !type:DamageTrigger
+        damage: 100
+      behaviors:
+      - !type:DoActsBehavior
+        acts: [ "Destruction" ]
+  - type: InteractionOutline
+
+- type: entity
+  id: ZLadderUp
+  parent: BaseZLadder
+  suffix: Up
+  description: Use your hands and be happy climbing down.
+  components:
+  - type: Ladder
+    up: true
+  - type: Sprite
+    sprite: _Dumont/Structures/ladders.rsi
+    state: ladder_down
+    drawdepth: FloorObjects
+
+- type: entity
+  id: ZLadderDown
+  parent: ZLadderUp
+  suffix: Down
+  description: Use your hands and be happy climbing down.
+  components:
+  - type: Ladder
+    up: false
+  - type: Sprite
+    sprite: _Dumont/Structures/ladders.rsi
+    state: ladder_up
+    drawdepth: FloorObjects
+
+# spawned client-side when you get close to a stairs/ladder, points at the level it leads to
+- type: entity
+  id: ZLevelDirectionArrow
+  categories: [ HideSpawnMenu ]
+  components:
+  - type: Sprite
+    sprite: Markers/teg_arrow.rsi
+    color: "#7CFC7CBB"
+    layers:
+    - state: arrow
+      offset: 0, 0.6
+  - type: Tag
+    tags:
+    - HideContextMenu
