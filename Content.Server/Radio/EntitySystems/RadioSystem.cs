@@ -65,6 +65,7 @@ using Content.Shared.Chat.RadioIconsEvents; // Goobstation
 using Content.Shared.Whitelist; // Goobstation
 using Content.Shared.StatusIcon; // Goobstation
 using Content.Goobstation.Shared.Radio; // Goobstation
+using Content.Shared._Dumont.ZLevel;
 
 namespace Content.Server.Radio.EntitySystems;
 
@@ -82,6 +83,7 @@ public sealed partial class RadioSystem : EntitySystem
     [Dependency] private readonly RadioJobIconSystem _radioIconSystem = default!; // Goobstation - radio icons
     [Dependency] private readonly LanguageSystem _language = default!; // Einstein Engines - Language
     [Dependency] private readonly EntityWhitelistSystem _whitelist = default!; // Goobstation - Whitelisted radio channels
+    [Dependency] private readonly SharedZLevelSystem _zLevel = default!; // Dumont - z-level radio
 
     // set used to prevent radio feedback loops.
     private readonly HashSet<string> _messages = new();
@@ -233,8 +235,10 @@ public sealed partial class RadioSystem : EntitySystem
         RaiseLocalEvent(radioSource, ref sendAttemptEv);
         var canSend = !sendAttemptEv.Cancelled;
 
-        var sourceMapId = Transform(radioSource).MapID;
-        var hasActiveServer = HasActiveServer(sourceMapId, channel.ID);
+        var sourceXform = Transform(radioSource); // dumont z-level - start
+        var sourceMapId = sourceXform.MapID;
+        var sourceMap = sourceXform.MapUid;
+        var hasActiveServer = HasActiveServer(sourceMap, channel.ID); // dumont z-level - end
         var sourceServerExempt = _exemptQuery.HasComp(radioSource);
 
         var radioQuery = EntityQueryEnumerator<ActiveRadioComponent, TransformComponent>();
@@ -247,7 +251,7 @@ public sealed partial class RadioSystem : EntitySystem
                     continue;
             }
 
-            if (!channel.LongRange && transform.MapID != sourceMapId && !radio.GlobalReceive
+            if (!channel.LongRange && !_zLevel.SameStack(transform.MapUid, sourceMap) && !radio.GlobalReceive // dumont change - z level
                 && !(HasActiveTransmitter(transform.MapID) && HasActiveTransmitter(sourceMapId))) // goob - intermap transmitters
                 continue;
 
@@ -343,12 +347,13 @@ public sealed partial class RadioSystem : EntitySystem
     // Einstein Engines - Language end
 
     /// <inheritdoc cref="TelecomServerComponent"/>
-    private bool HasActiveServer(MapId mapId, string channelId)
+    // dumont change - zlevel
+    private bool HasActiveServer(EntityUid? sourceMap, string channelId)
     {
         var servers = EntityQuery<TelecomServerComponent, EncryptionKeyHolderComponent, ApcPowerReceiverComponent, TransformComponent>();
         foreach (var (_, keys, power, transform) in servers)
         {
-            if (transform.MapID == mapId &&
+            if (_zLevel.SameStack(transform.MapUid, sourceMap) &&
                 power.Powered &&
                 keys.Channels.Contains(channelId))
             {
