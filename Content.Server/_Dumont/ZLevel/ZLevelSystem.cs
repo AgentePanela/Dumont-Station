@@ -1,4 +1,5 @@
 using System.Numerics;
+using Content.Server.Station.Systems;
 using Content.Shared._Dumont.ZLevel;
 using Content.Shared.Maps;
 using Content.Shared.Movement.Pulling.Components;
@@ -26,6 +27,7 @@ public sealed class ZLevelSystem : SharedZLevelSystem
     [Dependency] private readonly PvsOverrideSystem _pvs = default!;
     [Dependency] private readonly SharedMapSystem _map = default!;
     [Dependency] private readonly SharedTransformSystem _transform = default!;
+    [Dependency] private readonly StationSystem _station = default!;
     [Dependency] private readonly ZGridLinkingSystem _gridLinking = default!;
 
     private static readonly ProtoId<ContentTileDefinition> LatticeTile = "Lattice";
@@ -42,9 +44,10 @@ public sealed class ZLevelSystem : SharedZLevelSystem
         newMap = EntityUid.Invalid;
         error = string.Empty;
 
-        if (!TryComp<ZLevelMapComponent>(sourceMap, out var source))
+        if (!EnsureComp<ZLevelMapComponent>(sourceMap, out var source))
         {
-            source = AddComp<ZLevelMapComponent>(sourceMap);
+            // just added it, so this map is the origin of a new stack
+            source.BaseMap = sourceMap;
             if (TryComp<MapLightComponent>(sourceMap, out var light))
                 source.BaseAmbientLight = light.AmbientLightColor;
         }
@@ -57,6 +60,7 @@ public sealed class ZLevelSystem : SharedZLevelSystem
         }
 
         var newMapUid = _map.CreateMap(out var newMapId, runMapInit: true);
+        EntityUid? newGrid = null;
         if (gridPath != null)
         {
             if (!_loader.TryLoadGrid(newMapId, gridPath.Value, out var loadedGrid))
@@ -66,15 +70,17 @@ public sealed class ZLevelSystem : SharedZLevelSystem
                 return false;
             }
 
+            newGrid = loadedGrid.Value.Owner;
             if (anchorGrid != null)
-                AlignAndLinkGrid(loadedGrid.Value.Owner, anchorGrid.Value, up);
+                AlignAndLinkGrid(newGrid.Value, anchorGrid.Value, up);
         }
         else
-            CreateLatticeZGrid(newMapId, up, anchorGrid, anchorPos);
+            newGrid = CreateLatticeZGrid(newMapId, up, anchorGrid, anchorPos);
 
         var newComp = AddComp<ZLevelMapComponent>(newMapUid);
         newComp.Depth = source.Depth + (up ? 1 : -1);
         newComp.BaseAmbientLight = source.BaseAmbientLight;
+        newComp.BaseMap = source.BaseMap;
         if (up)
         {
             newComp.MapBelow = sourceMap;
@@ -104,6 +110,13 @@ public sealed class ZLevelSystem : SharedZLevelSystem
         _pvs.AddForceSend(newMapUid);
 
         _metaData.SetEntityName(newMapUid, $"Z[{newComp.Depth}] {Name(sourceMap)}");
+
+        // add the new grids to the station
+        if (newGrid != null && anchorGrid != null
+            && _station.GetOwningStation(anchorGrid.Value) is { } station)
+        {
+            _station.AddGridToStation(station, newGrid.Value, name: Name(station)); // get the same name of the station
+        }
 
         newMap = newMapUid;
         return true;
@@ -159,7 +172,7 @@ public sealed class ZLevelSystem : SharedZLevelSystem
     }
 
 
-    private void CreateLatticeZGrid(MapId newMapId, bool up, EntityUid? anchorGrid, Vector2 anchorPos)
+    private EntityUid CreateLatticeZGrid(MapId newMapId, bool up, EntityUid? anchorGrid, Vector2 anchorPos)
     {
         var grid = _mapManager.CreateGridEntity(newMapId);
         var center = Vector2i.Zero;
@@ -183,6 +196,8 @@ public sealed class ZLevelSystem : SharedZLevelSystem
                 _map.SetTile(grid.Owner, grid.Comp, center + new Vector2i(x, y), lattice);
             }
         }
+
+        return grid.Owner;
     }
 
     // Linked grids copy each other's world transform when moving, so the new grid has to be

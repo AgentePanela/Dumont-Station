@@ -16,6 +16,13 @@ public sealed partial class ZLevelMapComponent : Component
     public EntityUid? MapBelow;
 
     /// <summary>
+    /// The origin (depth 0) map of the stack. Every level points back to it so you can reach
+    /// the "main" map without walking the whole chain.
+    /// </summary>
+    [DataField, AutoNetworkedField]
+    public EntityUid? BaseMap;
+
+    /// <summary>
     /// 0 is the origin level
     /// </summary>
     [DataField, AutoNetworkedField]
