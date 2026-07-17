@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: MIT
 
 using Content.Server.GameTicking;
+using Content.Server._Dumont.ZLevel;
 
 namespace Content.Server.Station.Components;
 
@@ -18,7 +19,7 @@ namespace Content.Server.Station.Components;
 ///     Added to grids saved in maps to designate that they are the 'main station' grid.
 /// </summary>
 [RegisterComponent]
-[Access(typeof(GameTicker))]
+[Access(typeof(GameTicker), typeof(ZLevelSystem), typeof(ZGridLinkingSystem))] // Dumont - z-level floors copy the station id
 public sealed partial class BecomesStationComponent : Component
 {
     /// <summary>

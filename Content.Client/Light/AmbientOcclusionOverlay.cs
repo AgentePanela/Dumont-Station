@@ -1,4 +1,5 @@
 using System.Numerics;
+using Content.Client._Dumont.ZLevel;
 using Content.Shared.CCVar;
 using Content.Shared.Maps;
 using Robust.Client.Graphics;
@@ -33,10 +34,19 @@ public sealed class AmbientOcclusionOverlay : Overlay
     // Couldn't figure out a way to avoid this so if you can then please do.
     private IRenderTexture? _aoStencilTarget;
 
+    // Dumont change - zlevel
+    private const long MaxScanTiles = 4096;
+
     public AmbientOcclusionOverlay()
     {
         IoCManager.InjectDependencies(this);
         ZIndex = AfterLightTargetOverlay.ContentZIndex + 1;
+    }
+
+    protected override bool BeforeDraw(in OverlayDrawArgs args)
+    {
+        // Dumont - z-levels
+        return !ZLevelOverlay.ActiveViewports.Contains(args.Viewport);
     }
 
     protected override void Draw(in OverlayDrawArgs args)
@@ -118,6 +128,11 @@ public sealed class AmbientOcclusionOverlay : Overlay
 
                 foreach (var grid in _mapManager.FindGridsIntersecting(mapId, worldBounds))
                 {
+                    // Dumont change - zlevel: stop the overflow :sob:
+                    var localAabb = xformSystem.GetInvWorldMatrix(grid.Owner).TransformBox(worldBounds);
+                    if ((long) localAabb.Width * (long) localAabb.Height > MaxScanTiles)
+                        continue;
+
                     var transform = xformSystem.GetWorldMatrix(grid.Owner);
                     var worldToTextureMatrix = Matrix3x2.Multiply(transform, invMatrix);
                     var tiles = maps.GetTilesEnumerator(grid.Owner, grid, worldBounds);

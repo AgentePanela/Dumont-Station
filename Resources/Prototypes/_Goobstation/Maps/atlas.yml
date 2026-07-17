@@ -39,7 +39,7 @@
 - type: gameMap
   id: Atlas
   mapName: Atlas
-  mapPath: /Maps/_Goobstation/atlas.yml
+  mapPath: /Maps/_Gabystation/atlas/zatlas.yml # gaby z-level
   minPlayers: 0
   maxPlayers: 20
   stations:
