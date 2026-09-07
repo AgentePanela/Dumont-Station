@@ -159,6 +159,29 @@ public sealed partial class SingleMarkingPicker : BoxContainer
         {
             PopulateList(args.Text);
         };
+
+        // Dumont - hair gradient - start
+        GradientToggle.OnToggled += args =>
+        {
+            if (_markings == null || _markings.Count == 0)
+                return;
+
+            var marking = _markings[Slot];
+            marking.GradientColor = args.Pressed ? (marking.GradientColor ?? Color.White) : null;
+            PopulateGradient(marking);
+            OnColorChanged!((_slot, marking));
+        };
+
+        CoverageSlider.OnValueChanged += range =>
+        {
+            if (_markings == null || _markings.Count == 0)
+                return;
+
+            var marking = _markings[Slot];
+            marking.GradientCoverage = range.Value / 100f;
+            OnColorChanged!((_slot, marking));
+        };
+        // Dumont - end
     }
 
     public void UpdateData(List<Marking> markings, string species, int totalPoints)
@@ -270,7 +293,36 @@ public sealed partial class SingleMarkingPicker : BoxContainer
 
             ColorSelectorContainer.AddChild(selector);
         }
+
+        PopulateGradient(marking); // Dumont - hair gradient
     }
+
+    // Dumont - hair gradient - start
+    private void PopulateGradient(Marking marking)
+    {
+        GradientColorContainer.DisposeAllChildren();
+        GradientColorContainer.RemoveAllChildren();
+
+        var enabled = marking.GradientColor.HasValue;
+        GradientToggle.Pressed = enabled;
+        GradientControls.Visible = enabled;
+
+        var selector = new ColorSelectorSliders
+        {
+            HorizontalExpand = true,
+            Color = marking.GradientColor ?? Color.White,
+            SelectorType = ColorSelectorSliders.ColorSelectorType.Hsv,
+        };
+        selector.OnColorChanged += color =>
+        {
+            marking.GradientColor = color;
+            OnColorChanged!((_slot, marking));
+        };
+        GradientColorContainer.AddChild(selector);
+
+        CoverageSlider.SetValueWithoutEvent(marking.GradientCoverage * 100f);
+    }
+    // Dumont - end
 
     private void SelectMarking(ItemList.ItemListSelectedEventArgs args)
     {
@@ -292,6 +344,10 @@ public sealed partial class SingleMarkingPicker : BoxContainer
         {
             _markings[Slot].SetColor(i, oldMarking.MarkingColors[i]);
         }
+
+        // Dumont - hair gradient: keep the gradient setting when switching to a different style
+        _markings[Slot].GradientColor = oldMarking.GradientColor;
+        _markings[Slot].GradientCoverage = oldMarking.GradientCoverage;
 
         PopulateColors();
 

@@ -44,11 +44,27 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
     [DataField]
     public Color HairColor { get; set; } = Color.Black;
 
+    // Dumont - hair gradient - start
+    [DataField]
+    public Color? HairGradientColor { get; set; }
+
+    [DataField]
+    public float HairGradientCoverage { get; set; }
+    // Dumont - end
+
     [DataField("facialHair")]
     public string FacialHairStyleId { get; set; } = HairStyles.DefaultFacialHairStyle;
 
     [DataField]
     public Color FacialHairColor { get; set; } = Color.Black;
+
+    // Dumont - hair gradient - start
+    [DataField]
+    public Color? FacialHairGradientColor { get; set; }
+
+    [DataField]
+    public float FacialHairGradientCoverage { get; set; }
+    // Dumont - end
 
     [DataField]
     public Color EyeColor { get; set; } = Color.Black;
@@ -65,7 +81,11 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
         Color facialHairColor,
         Color eyeColor,
         Color skinColor,
-        List<Marking> markings)
+        List<Marking> markings,
+        Color? hairGradientColor = null, // Dumont - hair gradient - start
+        float hairGradientCoverage = 0f,
+        Color? facialHairGradientColor = null,
+        float facialHairGradientCoverage = 0f) // Dumont - end
     {
         HairStyleId = hairStyleId;
         HairColor = ClampColor(hairColor);
@@ -74,47 +94,89 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
         EyeColor = ClampColor(eyeColor);
         SkinColor = ClampColor(skinColor);
         Markings = markings;
+        // Dumont - hair gradient - start
+        HairGradientColor = hairGradientColor;
+        HairGradientCoverage = Math.Clamp(hairGradientCoverage, -1f, 1f);
+        FacialHairGradientColor = facialHairGradientColor;
+        FacialHairGradientCoverage = Math.Clamp(facialHairGradientCoverage, -1f, 1f);
+        // Dumont - end
     }
 
     public HumanoidCharacterAppearance(HumanoidCharacterAppearance other) :
-        this(other.HairStyleId, other.HairColor, other.FacialHairStyleId, other.FacialHairColor, other.EyeColor, other.SkinColor, new(other.Markings))
+        this(other.HairStyleId, other.HairColor, other.FacialHairStyleId, other.FacialHairColor, other.EyeColor, other.SkinColor, new(other.Markings),
+            other.HairGradientColor, other.HairGradientCoverage, other.FacialHairGradientColor, other.FacialHairGradientCoverage)
     {
 
     }
 
     public HumanoidCharacterAppearance WithHairStyleName(string newName)
     {
-        return new(newName, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings);
+        return new(newName, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
     }
 
     public HumanoidCharacterAppearance WithHairColor(Color newColor)
     {
-        return new(HairStyleId, newColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings);
+        return new(HairStyleId, newColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
     }
+
+    // Dumont - hair gradient - start
+    public HumanoidCharacterAppearance WithHairGradientColor(Color? newColor)
+    {
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings,
+            newColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
+    }
+
+    public HumanoidCharacterAppearance WithHairGradientCoverage(float newCoverage)
+    {
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, newCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
+    }
+    // Dumont - end
 
     public HumanoidCharacterAppearance WithFacialHairStyleName(string newName)
     {
-        return new(HairStyleId, HairColor, newName, FacialHairColor, EyeColor, SkinColor, Markings);
+        return new(HairStyleId, HairColor, newName, FacialHairColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage); // Dumont - hair gradient
     }
 
     public HumanoidCharacterAppearance WithFacialHairColor(Color newColor)
     {
-        return new(HairStyleId, HairColor, FacialHairStyleId, newColor, EyeColor, SkinColor, Markings);
+        return new(HairStyleId, HairColor, FacialHairStyleId, newColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage); // Dumont - hair gradient
     }
+
+    // Dumont - hair gradient - start
+    public HumanoidCharacterAppearance WithFacialHairGradientColor(Color? newColor)
+    {
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, newColor, FacialHairGradientCoverage);
+    }
+
+    public HumanoidCharacterAppearance WithFacialHairGradientCoverage(float newCoverage)
+    {
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, newCoverage);
+    }
+    // Dumont - end
 
     public HumanoidCharacterAppearance WithEyeColor(Color newColor)
     {
-        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, newColor, SkinColor, Markings);
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, newColor, SkinColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
     }
 
     public HumanoidCharacterAppearance WithSkinColor(Color newColor)
     {
-        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, newColor, Markings);
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, newColor, Markings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
     }
 
     public HumanoidCharacterAppearance WithMarkings(List<Marking> newMarkings)
     {
-        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, newMarkings);
+        return new(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, newMarkings,
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
     }
 
     public static HumanoidCharacterAppearance DefaultWithSpecies(string species)
@@ -254,7 +316,9 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
             facialHairColor,
             eyeColor,
             skinColor,
-            markingSet.GetForwardEnumerator().ToList());
+            markingSet.GetForwardEnumerator().ToList(),
+            appearance.HairGradientColor, appearance.HairGradientCoverage, // Dumont - hair gradient
+            appearance.FacialHairGradientColor, appearance.FacialHairGradientCoverage);
     }
 
     public bool MemberwiseEquals(ICharacterAppearance maybeOther)
@@ -267,6 +331,13 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
         if (!EyeColor.Equals(other.EyeColor)) return false;
         if (!SkinColor.Equals(other.SkinColor)) return false;
         if (!Markings.SequenceEqual(other.Markings)) return false;
+        // Dumont - hair gradient - start
+        // ts is ugly
+        if (!Equals(HairGradientColor, other.HairGradientColor)) return false;
+        if (!HairGradientCoverage.Equals(other.HairGradientCoverage)) return false;
+        if (!Equals(FacialHairGradientColor, other.FacialHairGradientColor)) return false;
+        if (!FacialHairGradientCoverage.Equals(other.FacialHairGradientCoverage)) return false;
+        // Dumont - end
         return true;
     }
 
@@ -280,7 +351,11 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
                FacialHairColor.Equals(other.FacialHairColor) &&
                EyeColor.Equals(other.EyeColor) &&
                SkinColor.Equals(other.SkinColor) &&
-               Markings.SequenceEqual(other.Markings);
+               Markings.SequenceEqual(other.Markings) &&
+               Equals(HairGradientColor, other.HairGradientColor) && // Dumont -start hair gradient
+               HairGradientCoverage.Equals(other.HairGradientCoverage) &&
+               Equals(FacialHairGradientColor, other.FacialHairGradientColor) &&
+               FacialHairGradientCoverage.Equals(other.FacialHairGradientCoverage); // Dumont - end
     }
 
     public override bool Equals(object? obj)
@@ -290,7 +365,10 @@ public sealed partial class HumanoidCharacterAppearance : ICharacterAppearance, 
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings);
+        // Dumont
+        return HashCode.Combine(
+            HashCode.Combine(HairStyleId, HairColor, FacialHairStyleId, FacialHairColor, EyeColor, SkinColor, Markings),
+            HairGradientColor, HairGradientCoverage, FacialHairGradientColor, FacialHairGradientCoverage);
     }
 
     public HumanoidCharacterAppearance Clone()

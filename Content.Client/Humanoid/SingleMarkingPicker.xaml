@@ -26,8 +26,21 @@ SPDX-License-Identifier: MIT
         </ScrollContainer>
 
         <!-- Color sliders -->
-        <ScrollContainer MinHeight="200" HorizontalExpand="True">
-            <BoxContainer Name="ColorSelectorContainer" HorizontalExpand="True" />
+        <ScrollContainer MinHeight="350" HorizontalExpand="True" VerticalExpand="True">
+            <BoxContainer Orientation="Vertical" HorizontalExpand="True">
+                <BoxContainer Name="ColorSelectorContainer" HorizontalExpand="True" />
+
+                <!-- Dumont - hair gradient -->
+                <CheckBox Name="GradientToggle" Text="{Loc 'marking-gradient-enable'}" />
+                <BoxContainer Name="GradientControls" Orientation="Vertical" HorizontalExpand="True" Visible="False">
+                    <BoxContainer Name="GradientColorContainer" HorizontalExpand="True" />
+                    <BoxContainer HorizontalExpand="True">
+                        <Label Name="CoverageLabel" Text="{Loc 'marking-gradient-coverage'}" MinWidth="110" />
+                        <Slider Name="CoverageSlider" MinValue="-100" MaxValue="100" Value="50" HorizontalExpand="True" Margin="5 0 5 0" />
+                    </BoxContainer>
+                </BoxContainer>
+            </BoxContainer>
         </ScrollContainer>
+
     </BoxContainer>
 </BoxContainer>

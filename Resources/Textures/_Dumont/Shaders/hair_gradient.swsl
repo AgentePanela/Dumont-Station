@@ -1,0 +1,19 @@
+uniform highp vec4 baseColor;
+uniform highp vec4 gradientColor;
+uniform highp float coverage;
+
+const highp float feather = 0.08;
+
+void fragment() {
+    highp vec4 sprite = zTexture(UV);
+
+    highp float t = UV.y;
+    highp float mag = abs(coverage);
+    if (coverage < 0.0)
+        t = 1.0 - t;
+
+    highp float threshold = 1.0 - mag;
+    highp float factor = smoothstep(threshold - feather, threshold + feather, t);
+
+    COLOR = sprite * mix(baseColor, gradientColor, factor);
+}

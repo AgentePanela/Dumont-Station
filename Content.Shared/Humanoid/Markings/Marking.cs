@@ -23,6 +23,14 @@ namespace Content.Shared.Humanoid.Markings
         [DataField("markingColor")]
         private List<Color> _markingColors = new();
 
+        // Dumont - hair gradient
+        [DataField("gradientColor")]
+        public Color? GradientColor { get; set; }
+
+        [DataField("gradientCoverage")]
+        public float GradientCoverage { get; set; }
+        // Dumont - end
+
         private Marking()
         {
         }
@@ -55,6 +63,8 @@ namespace Content.Shared.Humanoid.Markings
             _markingColors = new(other.MarkingColors);
             Visible = other.Visible;
             Forced = other.Forced;
+            GradientColor = other.GradientColor; // Dumont - hair gradient
+            GradientCoverage = other.GradientCoverage; // Dumont - hair gradient
         }
 
         /// <summary>
@@ -119,7 +129,9 @@ namespace Content.Shared.Humanoid.Markings
             return MarkingId.Equals(other.MarkingId)
                 && _markingColors.SequenceEqual(other._markingColors)
                 && Visible.Equals(other.Visible)
-                && Forced.Equals(other.Forced);
+                && Forced.Equals(other.Forced)
+                && GradientColor.Equals(other.GradientColor)
+                && GradientCoverage.Equals(other.GradientCoverage);
         }
 
         // VERY BIG TODO: TURN THIS INTO JSONSERIALIZER IMPLEMENTATION
@@ -141,19 +153,39 @@ namespace Content.Shared.Humanoid.Markings
             foreach (Color color in _markingColors)
                 colorStringList.Add(color.ToHex());
 
-            return $"{sanitizedName}@{String.Join(',', colorStringList)}";
+            var result = $"{sanitizedName}@{String.Join(',', colorStringList)}";
+
+            // Dumont - hair gradient
+            if (GradientColor is { } gradientColor)
+                result += $"@{gradientColor.ToHex()},{GradientCoverage}";
+
+            return result;
         }
 
         public static Marking? ParseFromDbString(string input)
         {
             if (input.Length == 0) return null;
             var split = input.Split('@');
-            if (split.Length != 2) return null;
+            if (split.Length != 2 && split.Length != 3) return null;
             List<Color> colorList = new();
             foreach (string color in split[1].Split(','))
                 colorList.Add(Color.FromHex(color));
 
-            return new Marking(split[0], colorList);
+            var marking = new Marking(split[0], colorList);
+
+            // Dumont - hair gradient
+            if (split.Length == 3)
+            {
+                var gradientParts = split[2].Split(',');
+                if (gradientParts.Length == 2 && float.TryParse(gradientParts[1], out var coverage))
+                {
+                    marking.GradientColor = Color.FromHex(gradientParts[0]);
+                    marking.GradientCoverage = coverage;
+                }
+            }
+            // Dumont - end
+
+            return marking;
         }
     }
 }

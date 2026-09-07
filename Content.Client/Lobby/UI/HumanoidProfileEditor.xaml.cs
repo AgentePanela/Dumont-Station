@@ -481,7 +481,10 @@ namespace Content.Client.Lobby.UI
                 if (Profile is null)
                     return;
                 Profile = Profile.WithCharacterAppearance(
-                    Profile.Appearance.WithHairColor(newColor.marking.MarkingColors[0]));
+                    Profile.Appearance.WithHairColor(newColor.marking.MarkingColors[0])
+                        // Dumont - hair gradient
+                        .WithHairGradientColor(newColor.marking.GradientColor)
+                        .WithHairGradientCoverage(newColor.marking.GradientCoverage));
                 UpdateCMarkingsHair();
                 ReloadPreview();
             };
@@ -500,7 +503,10 @@ namespace Content.Client.Lobby.UI
                 if (Profile is null)
                     return;
                 Profile = Profile.WithCharacterAppearance(
-                    Profile.Appearance.WithFacialHairColor(newColor.marking.MarkingColors[0]));
+                    Profile.Appearance.WithFacialHairColor(newColor.marking.MarkingColors[0])
+                        // Dumont - hair gradient
+                        .WithFacialHairGradientColor(newColor.marking.GradientColor)
+                        .WithFacialHairGradientCoverage(newColor.marking.GradientCoverage));
                 UpdateCMarkingsFacialHair();
                 ReloadPreview();
             };
@@ -1959,11 +1965,25 @@ namespace Content.Client.Lobby.UI
             }
             var hairMarking = Profile.Appearance.HairStyleId == HairStyles.DefaultHairStyle
                 ? new List<Marking>()
-                : new() { new(Profile.Appearance.HairStyleId, new List<Color>() { Profile.Appearance.HairColor }) };
+                : new() // Dumont - hair gradient
+                {
+                    new(Profile.Appearance.HairStyleId, new List<Color>() { Profile.Appearance.HairColor })
+                    {
+                        GradientColor = Profile.Appearance.HairGradientColor,
+                        GradientCoverage = Profile.Appearance.HairGradientCoverage,
+                    },
+                };
 
             var facialHairMarking = Profile.Appearance.FacialHairStyleId == HairStyles.DefaultFacialHairStyle
                 ? new List<Marking>()
-                : new() { new(Profile.Appearance.FacialHairStyleId, new List<Color>() { Profile.Appearance.FacialHairColor }) };
+                : new() // Dumont - hair gradient
+                {
+                    new(Profile.Appearance.FacialHairStyleId, new List<Color>() { Profile.Appearance.FacialHairColor })
+                    {
+                        GradientColor = Profile.Appearance.FacialHairGradientColor,
+                        GradientCoverage = Profile.Appearance.FacialHairGradientCoverage,
+                    },
+                };
 
             HairStylePicker.UpdateData(
                 hairMarking,

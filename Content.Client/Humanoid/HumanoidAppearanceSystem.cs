@@ -34,6 +34,7 @@ using Content.Shared.Humanoid.Prototypes;
 using Content.Shared.Inventory;
 using Content.Shared.Preferences;
 using Robust.Client.GameObjects;
+using Robust.Client.Graphics;
 using Robust.Shared.Configuration;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Utility;
@@ -48,6 +49,7 @@ public sealed class HumanoidAppearanceSystem : SharedHumanoidAppearanceSystem
     [Dependency] private readonly DisplacementMapSystem _displacement = default!;
     [Dependency] private readonly SpriteSystem _sprite = default!;
 
+    private static readonly ProtoId<ShaderPrototype> HairGradientShader = "HairGradient"; // Dumont - hair gradient
     public override void Initialize()
     {
         base.Initialize();
@@ -219,13 +221,23 @@ public sealed class HumanoidAppearanceSystem : SharedHumanoidAppearanceSystem
             ? profile.Appearance.SkinColor.WithAlpha(hairAlpha)
             : profile.Appearance.HairColor;
         var hair = new Marking(profile.Appearance.HairStyleId,
-            new[] { hairColor });
+            new[] { hairColor })
+        {
+            // Dumont - hair gradient
+            GradientColor = profile.Appearance.HairGradientColor,
+            GradientCoverage = profile.Appearance.HairGradientCoverage,
+        };
 
         var facialHairColor = _markingManager.MustMatchSkin(profile.Species, HumanoidVisualLayers.FacialHair, out var facialHairAlpha, _prototypeManager)
             ? profile.Appearance.SkinColor.WithAlpha(facialHairAlpha)
             : profile.Appearance.FacialHairColor;
         var facialHair = new Marking(profile.Appearance.FacialHairStyleId,
-            new[] { facialHairColor });
+            new[] { facialHairColor })
+        {
+            // Dumont - hair gradient
+            GradientColor = profile.Appearance.FacialHairGradientColor,
+            GradientCoverage = profile.Appearance.FacialHairGradientCoverage,
+        };
 
         if (_markingManager.CanBeApplied(profile.Species, profile.Sex, hair, _prototypeManager))
         {
@@ -288,7 +300,7 @@ public sealed class HumanoidAppearanceSystem : SharedHumanoidAppearanceSystem
             {
                 if (_markingManager.TryGetMarking(marking, out var markingPrototype))
                 {
-                    ApplyMarking(markingPrototype, marking.MarkingColors, marking.Visible, entity);
+                    ApplyMarking(markingPrototype, marking, entity); // Dumont - hair gradient: pass the whole Marking, not just colors/visible
                 }
             }
         }
@@ -346,10 +358,11 @@ public sealed class HumanoidAppearanceSystem : SharedHumanoidAppearanceSystem
         }
     }
     private void ApplyMarking(MarkingPrototype markingPrototype,
-        IReadOnlyList<Color>? colors,
-        bool visible,
+        Marking marking,
         Entity<HumanoidAppearanceComponent, SpriteComponent> entity)
     {
+        var colors = marking.MarkingColors;// Dumont - hair gradient
+        var visible = marking.Visible;// Dumont - hair gradient
         var humanoid = entity.Comp1;
         var sprite = entity.Comp2;
 
@@ -400,24 +413,41 @@ public sealed class HumanoidAppearanceSystem : SharedHumanoidAppearanceSystem
             // Okay so if the marking prototype is modified but we load old marking data this may no longer be valid
             // and we need to check the index is correct.
             // So if that happens just default to white?
+
+            Color color; // Dumont -  gradient
             if (colors != null && j < colors.Count)
             {
                 // Goob edit start
-                var color = colors[j];
+                color = colors[j];
                 if (hasInfo && info.Color != null)
                     color = Color.InterpolateBetween(color, info.Color.Value, 0.5f);
-                _sprite.LayerSetColor((entity.Owner, sprite), layerId, color);
                 // Goob edit end
             }
             else
             {
                 // Goob edit start
-                var color = Color.White;
+                color = Color.White;
                 if (hasInfo && info.Color != null)
                     color = info.Color.Value;
-                _sprite.LayerSetColor((entity.Owner, sprite), layerId, color);
                 // Goob edit end
             }
+
+            // Dumont - hair gradient - start
+            if (marking.GradientColor is { } gradientColor)
+            {
+                // overrides whatever shader the marking had
+                var gradientShader = _prototypeManager.Index(HairGradientShader).InstanceUnique();
+                gradientShader.SetParameter("baseColor", color);
+                gradientShader.SetParameter("gradientColor", gradientColor);
+                gradientShader.SetParameter("coverage", marking.GradientCoverage);
+                sprite.LayerSetShader(layer, gradientShader);
+                _sprite.LayerSetColor((entity.Owner, sprite), layerId, Color.White);
+            }
+            else
+            {
+                _sprite.LayerSetColor((entity.Owner, sprite), layerId, color);
+            }
+            // Dumont - end
 
             if (humanoid.MarkingsDisplacement.TryGetValue(markingPrototype.BodyPart, out var displacementData) && markingPrototype.CanBeDisplaced)
                 _displacement.TryAddDisplacement(displacementData, (entity.Owner, sprite), targetLayer + j + 1, layerId, out _);
@@ -469,13 +499,14 @@ public sealed class HumanoidAppearanceSystem : SharedHumanoidAppearanceSystem
 
         // I fucking hate this. I'll get around to refactoring sprite layers eventually I swear
         // Just a week away...
+        // fuck ts shit - panela
 
         foreach (var markingList in ent.Comp.MarkingSet.Markings.Values)
         {
             foreach (var marking in markingList)
             {
                 if (_markingManager.TryGetMarking(marking, out var markingPrototype) && markingPrototype.BodyPart == layer)
-                    ApplyMarking(markingPrototype, marking.MarkingColors, marking.Visible, (ent, ent.Comp, sprite));
+                    ApplyMarking(markingPrototype, marking, (ent, ent.Comp, sprite)); // Dumont - hair gradient
             }
         }
     }
