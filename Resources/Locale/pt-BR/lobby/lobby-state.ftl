@@ -10,15 +10,13 @@ lobby-state-player-status-ready = Pronto
 lobby-state-player-status-observer = Observador
 lobby-state-player-status-round-not-started = A rodada ainda não começou
 lobby-state-player-status-round-time =
-    O tempo da rodada é {$hours} {$hours ->
-    [0]hora
+    O tempo da rodada é: {$hours} {$hours ->
     [1]hora
     *[other]horas
     } e {$minutes} {$minutes ->
-    [0]minuto
     [1]minuto
     *[other]minutos
-    }.
+    }
 lobby-state-song-text = Tocando: [color=white]{$songTitle}[/color] de [color=white]{$songArtist}[/color]
 lobby-state-song-no-song-text = Nenhuma música de lobby tocando.
 lobby-state-song-unknown-title = [color=dimgray]Título desconhecido[/color]

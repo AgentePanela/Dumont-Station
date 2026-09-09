@@ -1,4 +1,5 @@
-game-ticker-get-ingame-info-text = A rodada atual é [color=white]#{$roundId}[/color].
-                                   A quantidade atual de jogadores é [color=white]{$playerCount}[/color].
-                                   O mapa atual é [color=white]{$mapName}[/color].
-                                   O modo de jogo atual é [color=white]{$gmTitle}[/color] [icon src="JobIconNoId" tooltip="{$desc}"/].
+game-ticker-get-ingame-info-text = A rodada atual é: [color=#C73C55]#{$roundId}[/color]
+                                   O número atual de jogadores é: [color=#C73C55]{$playerCount}[/color]
+                                   O mapa atual é: [color=#C73C55]{$mapName}[/color]
+                                   O modo de jogo atual é: [color=#C73C55]{$gmTitle}[/color]
+                                   >[color=yellow]{$desc}[/color]
