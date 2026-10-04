@@ -8,7 +8,9 @@ using Content.Shared._Dumont.CCVar;
 using Content.Shared._Dumont.Election;
 using Content.Shared.Dataset;
 using Content.Shared.GameTicking;
+using Content.Server.Station.Systems;
 using Content.Shared.Interaction;
+using Content.Shared.Pinpointer;
 using Content.Shared.Preferences;
 using Content.Shared.Roles;
 using Robust.Server.Player;
@@ -35,10 +37,12 @@ public sealed partial class ElectionSystem : EntitySystem
     [Dependency] private IPrototypeManager _proto = default!;
     [Dependency] private IRobustRandom _random = default!;
     [Dependency] private SharedMapSystem _map = default!;
+    [Dependency] private StationSystem _station = default!;
 
     private static readonly ProtoId<LocalizedDatasetPrototype> Parties = "ElectionParties";
     private static readonly ProtoId<DepartmentPrototype> Command = "Command";
     private static readonly ProtoId<JobPrototype> NpcJob = "Passenger";
+    private static readonly EntProtoId FallbackPod = "SpawnPodElectionScreen";
     private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("pt-BR");
 
     private static readonly DateTime Start = new(2026, 10, 4, 20, 0, 0, DateTimeKind.Utc);
@@ -397,32 +401,62 @@ public sealed partial class ElectionSystem : EntitySystem
     {
         _delivered = true;
 
-        var sent = false;
+        var places = new List<string>();
         var query = EntityQueryEnumerator<ElectionScreenSpawnerComponent, TransformComponent>();
-        while (query.MoveNext(out _, out var spawner, out var xform))
+        while (query.MoveNext(out var uid, out var spawner, out var xform))
         {
-            if (xform.GridUid is not { } gridUid || !TryComp<MapGridComponent>(gridUid, out var grid))
-                continue;
-
-            // the beacon usually sits under a table or chair, so look around for a free tile
-            var origin = _map.TileIndicesFor(gridUid, grid, xform.Coordinates);
-            var tile = origin;
-            for (var i = 0; i < 9; i++)
-            {
-                var candidate = origin + new Vector2i(i % 3 - 1, i / 3 - 1);
-                if (IsBlocked(gridUid, grid, candidate))
-                    continue;
-
-                tile = candidate;
-                break;
-            }
-
-            Spawn(spawner.Prototype, _map.GridTileToLocal(gridUid, grid, tile));
-            sent = true;
+            if (DropPod(uid, xform, spawner.Prototype, out var place))
+                places.Add(place);
         }
 
-        if (sent)
-            _chat.DispatchGlobalAnnouncement(Loc.GetString("election-announcement-delivery"), colorOverride: Color.Gold);
+        if (places.Count == 0)
+        {
+            var beacons = new List<EntityUid>();
+            var beaconQuery = EntityQueryEnumerator<NavMapBeaconComponent, TransformComponent>();
+            while (beaconQuery.MoveNext(out var uid, out var beacon, out _))
+            {
+                if (beacon.Enabled && beacon.Text != null && _station.GetOwningStation(uid) != null)
+                    beacons.Add(uid);
+            }
+
+            if (beacons.Count > 0)
+            {
+                var uid = _random.Pick(beacons);
+                if (DropPod(uid, Transform(uid), FallbackPod, out var place))
+                    places.Add(place);
+            }
+        }
+
+        if (places.Count == 0)
+            return;
+
+        _chat.DispatchGlobalAnnouncement(
+            Loc.GetString("election-announcement-delivery", ("location", string.Join(", ", places))),
+            colorOverride: Color.Gold);
+    }
+
+    private bool DropPod(EntityUid beacon, TransformComponent xform, EntProtoId pod, out string place)
+    {
+        place = string.Empty;
+        if (xform.GridUid is not { } gridUid || !TryComp<MapGridComponent>(gridUid, out var grid))
+            return false;
+
+        // the beacon usually sits under a table or chair, so look around for a free tile
+        var origin = _map.TileIndicesFor(gridUid, grid, xform.Coordinates);
+        var tile = origin;
+        for (var i = 0; i < 9; i++)
+        {
+            var candidate = origin + new Vector2i(i % 3 - 1, i / 3 - 1);
+            if (IsBlocked(gridUid, grid, candidate))
+                continue;
+
+            tile = candidate;
+            break;
+        }
+
+        Spawn(pod, _map.GridTileToLocal(gridUid, grid, tile));
+        place = CompOrNull<NavMapBeaconComponent>(beacon)?.Text ?? Name(beacon);
+        return true;
     }
 
     private bool IsBlocked(EntityUid gridUid, MapGridComponent grid, Vector2i tile)

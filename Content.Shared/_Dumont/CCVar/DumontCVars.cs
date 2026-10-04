@@ -17,7 +17,7 @@ public sealed partial class DumontCVars
     /// seconds between requests to the TSE
     /// </summary>
     public static readonly CVarDef<float> ElectionInterval =
-        CVarDef.Create("election.interval", 60f, CVar.SERVERONLY);
+        CVarDef.Create("election.interval", 30f, CVar.SERVERONLY);
 
     /// <summary>
     /// seconds into the round before candidates get picked and the screens go live

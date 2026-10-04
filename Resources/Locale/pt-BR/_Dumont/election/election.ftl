@@ -20,7 +20,7 @@ election-screen-final-elected = PRESIDENTE DO SETOR - ELEITO
 election-screen-final-second-round = HAVERÁ 2º TURNO
 election-screen-rank = { $rank }. { $name } { $percent }%
 
-election-announcement-delivery = O Comando Central enviou ao bar um droppod com um telão eleitoral, uma multitool e cadeiras dobráveis para a tripulação acompanhar a apuração das Eleições Gerais do Setor.
+election-announcement-delivery = A Central de Comando enviou um droppod para { $location } com um telão eleitoral, uma multitool e cadeiras dobráveis para a tripulação acompanhar a apuração das Eleições Gerais do Setor.
 election-announcement-start = As urnas das Eleições Gerais do Setor foram fechadas e os telões eleitorais estão ligados. Acompanhe a apuração para Presidente do Setor. Candidatos: {$candidates}
 election-announcement-candidate = { $name } ({$party})
 election-announcement-elected = Apuração encerrada. { $name } ({$party}) venceu a eleição para Presidente do Setor com {$percent}% dos votos válidos.
