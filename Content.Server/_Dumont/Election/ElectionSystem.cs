@@ -65,6 +65,8 @@ public sealed partial class ElectionSystem : EntitySystem
     private bool _selected;
     private bool _standbySent;
     private bool _delivered;
+    private bool _checked;
+    private bool _cancelled;
 
     private ElectionResult? _latest;
     private bool _fetching;
@@ -103,22 +105,29 @@ public sealed partial class ElectionSystem : EntitySystem
         if (elapsed < 0f)
             return;
 
-        if (!_standbySent)
+        if (_cancelled)
+            return;
+
+        // nothing moves until this round has heard from the TSE at least once
+        if (_checked)
         {
-            _standbySent = true;
-            Broadcast();
-        }
+            if (!_standbySent)
+            {
+                _standbySent = true;
+                Broadcast();
+            }
 
-        if (!_delivered && elapsed >= _cfg.GetCVar(DumontCVars.ElectionDelivery))
-            Deliver();
+            if (!_delivered && elapsed >= _cfg.GetCVar(DumontCVars.ElectionDelivery))
+                Deliver();
 
-        if (!_selected && elapsed >= _cfg.GetCVar(DumontCVars.ElectionDelay))
-            SelectCandidates();
+            if (!_selected && elapsed >= _cfg.GetCVar(DumontCVars.ElectionDelay))
+                SelectCandidates();
 
-        if (_selected && _finalPending)
-        {
-            _finalPending = false;
-            AnnounceFinal();
+            if (_selected && _finalPending)
+            {
+                _finalPending = false;
+                AnnounceFinal();
+            }
         }
 
         if (_fetching || _timing.RealTime < _nextPoll)
@@ -158,6 +167,16 @@ public sealed partial class ElectionSystem : EntitySystem
     {
         var previous = _latest?.Phase;
         _latest = result;
+
+        // a round that starts with the count already over sits this one out
+        if (!_checked)
+        {
+            _checked = true;
+            _cancelled = result.Phase is ElectionPhase.SecondRound or ElectionPhase.Elected;
+        }
+
+        if (_cancelled)
+            return;
 
         // only announce if we saw it happen, otherwise every restart would announce it again
         if (previous is ElectionPhase.Waiting or ElectionPhase.Counting
@@ -320,6 +339,9 @@ public sealed partial class ElectionSystem : EntitySystem
         _selected = false;
         _standbySent = false;
         _delivered = false;
+        _checked = false;
+        _cancelled = false;
+        _nextPoll = TimeSpan.Zero;
     }
 
     private void ResetData()
@@ -329,6 +351,8 @@ public sealed partial class ElectionSystem : EntitySystem
         _testStart = null;
         _testWeights = null;
         _nextPoll = TimeSpan.Zero;
+        _checked = false;
+        _cancelled = false;
 
         foreach (var slot in _slots)
         {
