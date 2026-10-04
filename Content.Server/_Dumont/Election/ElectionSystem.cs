@@ -41,6 +41,8 @@ public sealed partial class ElectionSystem : EntitySystem
     private static readonly ProtoId<JobPrototype> NpcJob = "Passenger";
     private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("pt-BR");
 
+    private static readonly DateTime Start = new(2026, 10, 4, 20, 0, 0, DateTimeKind.Utc);
+
     private const float TestInterval = 2f;
     private const float TestWarmup = 10f;
     private const long TestVotes = 150_000_000;
@@ -97,16 +99,20 @@ public sealed partial class ElectionSystem : EntitySystem
         if (!_cfg.GetCVar(DumontCVars.ElectionEnabled) || _ticker.RunLevel != GameRunLevel.InRound)
             return;
 
+        var elapsed = Elapsed();
+        if (elapsed < 0f)
+            return;
+
         if (!_standbySent)
         {
             _standbySent = true;
             Broadcast();
         }
 
-        if (!_delivered && _ticker.RoundDuration().TotalSeconds >= _cfg.GetCVar(DumontCVars.ElectionDelivery))
+        if (!_delivered && elapsed >= _cfg.GetCVar(DumontCVars.ElectionDelivery))
             Deliver();
 
-        if (!_selected && _ticker.RoundDuration().TotalSeconds >= _cfg.GetCVar(DumontCVars.ElectionDelay))
+        if (!_selected && elapsed >= _cfg.GetCVar(DumontCVars.ElectionDelay))
             SelectCandidates();
 
         if (_selected && _finalPending)
@@ -353,6 +359,16 @@ public sealed partial class ElectionSystem : EntitySystem
         Dirty(ent);
     }
 
+    // seconds since the round started or the polls closed, whichever came last
+    private float Elapsed()
+    {
+        var round = (float) _ticker.RoundDuration().TotalSeconds;
+        if (_cfg.GetCVar(DumontCVars.ElectionTest))
+            return round;
+
+        return Math.Min(round, (float) (DateTime.UtcNow - Start).TotalSeconds);
+    }
+
     private void Deliver()
     {
         _delivered = true;
@@ -425,7 +441,7 @@ public sealed partial class ElectionSystem : EntitySystem
         if (!_selected)
         {
             state.Phase = ElectionPhase.Standby;
-            state.StartsAt = _ticker.RoundStartTimeSpan + TimeSpan.FromSeconds(_cfg.GetCVar(DumontCVars.ElectionDelay));
+            state.StartsAt = _timing.CurTime + TimeSpan.FromSeconds(_cfg.GetCVar(DumontCVars.ElectionDelay) - Elapsed());
             return state;
         }
 
