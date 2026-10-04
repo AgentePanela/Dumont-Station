@@ -25,6 +25,8 @@
   - type: ApcPowerReceiver
     powerLoad: 200
   - type: ElectionScreen
+    screenPosition: 4,8
+    screenSize: 88,48
 
 - type: entity
   parent: BaseFlatpack
@@ -34,3 +36,17 @@
   components:
   - type: Flatpack
     entity: ElectionScreen
+
+- type: entity
+  parent: SpawnSupplyEmpty
+  id: SpawnPodElectionScreen
+  name: election screen drop pod
+  categories: [ HideSpawnMenu ]
+  components:
+  - type: SpawnTableOnDespawn
+    table: !type:AllSelector
+      children:
+      - id: ElectionScreenFlatpack
+      - id: Multitool
+      - id: ChairFoldingSpawnFolded
+        amount: 15

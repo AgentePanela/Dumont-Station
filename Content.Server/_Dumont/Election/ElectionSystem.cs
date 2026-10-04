@@ -35,7 +35,6 @@ public sealed partial class ElectionSystem : EntitySystem
     [Dependency] private IPrototypeManager _proto = default!;
     [Dependency] private IRobustRandom _random = default!;
     [Dependency] private SharedMapSystem _map = default!;
-    [Dependency] private SharedTransformSystem _xform = default!;
 
     private static readonly ProtoId<LocalizedDatasetPrototype> Parties = "ElectionParties";
     private static readonly ProtoId<DepartmentPrototype> Command = "Command";
@@ -63,6 +62,7 @@ public sealed partial class ElectionSystem : EntitySystem
     private readonly List<Slot> _slots = new();
     private bool _selected;
     private bool _standbySent;
+    private bool _delivered;
 
     private ElectionResult? _latest;
     private bool _fetching;
@@ -78,7 +78,6 @@ public sealed partial class ElectionSystem : EntitySystem
 
         SubscribeLocalEvent<PlayerSpawnCompleteEvent>(OnSpawnComplete);
         SubscribeLocalEvent<RoundRestartCleanupEvent>(OnRoundRestart);
-        SubscribeLocalEvent<ElectionScreenSpawnerComponent, MapInitEvent>(OnSpawnerMapInit);
         SubscribeLocalEvent<ElectionScreenComponent, ActivateInWorldEvent>(OnActivate);
 
         Subs.CVar(_cfg, DumontCVars.ElectionTest, _ => ResetData());
@@ -103,6 +102,9 @@ public sealed partial class ElectionSystem : EntitySystem
             _standbySent = true;
             Broadcast();
         }
+
+        if (!_delivered && _ticker.RoundDuration().TotalSeconds >= _cfg.GetCVar(DumontCVars.ElectionDelivery))
+            Deliver();
 
         if (!_selected && _ticker.RoundDuration().TotalSeconds >= _cfg.GetCVar(DumontCVars.ElectionDelay))
             SelectCandidates();
@@ -311,6 +313,7 @@ public sealed partial class ElectionSystem : EntitySystem
         _slots.Clear();
         _selected = false;
         _standbySent = false;
+        _delivered = false;
     }
 
     private void ResetData()
@@ -350,30 +353,36 @@ public sealed partial class ElectionSystem : EntitySystem
         Dirty(ent);
     }
 
-    private void OnSpawnerMapInit(Entity<ElectionScreenSpawnerComponent> ent, ref MapInitEvent args)
+    private void Deliver()
     {
-        if (!_cfg.GetCVar(DumontCVars.ElectionEnabled))
-            return;
+        _delivered = true;
 
-        var xform = Transform(ent);
-        if (xform.GridUid is not { } gridUid || !TryComp<MapGridComponent>(gridUid, out var grid))
-            return;
-
-        // the beacon usually sits under a table or chair, so look around for a free tile
-        var origin = _map.TileIndicesFor(gridUid, grid, xform.Coordinates);
-        var tile = origin;
-        for (var i = 0; i < 9; i++)
+        var sent = false;
+        var query = EntityQueryEnumerator<ElectionScreenSpawnerComponent, TransformComponent>();
+        while (query.MoveNext(out _, out var spawner, out var xform))
         {
-            var candidate = origin + new Vector2i(i % 3 - 1, i / 3 - 1);
-            if (IsBlocked(gridUid, grid, candidate))
+            if (xform.GridUid is not { } gridUid || !TryComp<MapGridComponent>(gridUid, out var grid))
                 continue;
 
-            tile = candidate;
-            break;
+            // the beacon usually sits under a table or chair, so look around for a free tile
+            var origin = _map.TileIndicesFor(gridUid, grid, xform.Coordinates);
+            var tile = origin;
+            for (var i = 0; i < 9; i++)
+            {
+                var candidate = origin + new Vector2i(i % 3 - 1, i / 3 - 1);
+                if (IsBlocked(gridUid, grid, candidate))
+                    continue;
+
+                tile = candidate;
+                break;
+            }
+
+            Spawn(spawner.Prototype, _map.GridTileToLocal(gridUid, grid, tile));
+            sent = true;
         }
 
-        var screen = Spawn(ent.Comp.Prototype, _map.GridTileToLocal(gridUid, grid, tile));
-        _xform.AnchorEntity(screen);
+        if (sent)
+            _chat.DispatchGlobalAnnouncement(Loc.GetString("election-announcement-delivery"), colorOverride: Color.Gold);
     }
 
     private bool IsBlocked(EntityUid gridUid, MapGridComponent grid, Vector2i tile)

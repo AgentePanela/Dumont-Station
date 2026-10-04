@@ -26,6 +26,12 @@ public sealed partial class DumontCVars
         CVarDef.Create("election.delay", 900f, CVar.SERVERONLY);
 
     /// <summary>
+    /// seconds into the round before the drop pod with the screen arrives
+    /// </summary>
+    public static readonly CVarDef<float> ElectionDelivery =
+        CVarDef.Create("election.delivery", 300f, CVar.SERVERONLY);
+
+    /// <summary>
     /// how many candidate slots to open while the TSE has not sent the list
     /// </summary>
     public static readonly CVarDef<int> ElectionCandidates =

@@ -36,13 +36,10 @@ public sealed partial class ElectionScreenOverlay : Overlay
     public override OverlaySpace Space => OverlaySpace.ScreenSpace;
 
     // everything here is in sprite pixels, from the top left of the lit area
-    private static readonly Vector2 DisplayOrigin = new(-44f, -40f);
-    private const float Width = 88f;
     private const float HeaderHeight = 6f;
     private const float RowHeight = 11f;
-    private const float FooterBaseline = 46f;
+    private const float FooterHeight = 7f;
     private const float PortraitSize = 10f;
-    private const int RowsPerPage = 3;
     private const float PageSeconds = 6f;
     private const float SightRange = 25f;
     private const int PortraitFrames = 8;
@@ -64,6 +61,11 @@ public sealed partial class ElectionScreenOverlay : Overlay
 
     private readonly Dictionary<string, Portrait> _portraits = new();
     private ElectionStateEvent? _state;
+
+    // lit area of the screen being drawn right now
+    private float _width;
+    private float _height;
+    private int _rows;
 
     public ElectionScreenOverlay()
     {
@@ -124,9 +126,12 @@ public sealed partial class ElectionScreenOverlay : Overlay
         var matrix = args.ViewportControl.GetWorldToScreenMatrix();
         var bounds = args.WorldBounds.Enlarged(3f);
 
-        var query = _entMan.EntityQueryEnumerator<ElectionScreenComponent, TransformComponent>();
-        while (query.MoveNext(out var uid, out var screen, out var xform))
+        var query = _entMan.EntityQueryEnumerator<ElectionScreenComponent, SpriteComponent, TransformComponent>();
+        while (query.MoveNext(out var uid, out var screen, out var sprite, out var xform))
         {
+            if (sprite.BaseRSI is not { } rsi)
+                continue;
+
             if (xform.MapID != args.MapId)
                 continue;
 
@@ -136,7 +141,15 @@ public sealed partial class ElectionScreenOverlay : Overlay
 
             var center = Vector2.Transform(world, matrix);
             var unit = (Vector2.Transform(world + Vector2.UnitX, matrix) - center).Length() / EyeManager.PixelsPerMeter;
-            DrawScreen(handle, center + DisplayOrigin * unit, unit, screen.Mode);
+
+            var size = (Vector2) rsi.Size;
+            var topLeft = new Vector2(-size.X / 2f + sprite.Offset.X * EyeManager.PixelsPerMeter,
+                -size.Y / 2f - sprite.Offset.Y * EyeManager.PixelsPerMeter) + screen.ScreenPosition;
+            _width = screen.ScreenSize.X;
+            _height = screen.ScreenSize.Y;
+            _rows = Math.Max(1, (int) ((_height - HeaderHeight - 1f - FooterHeight) / RowHeight));
+
+            DrawScreen(handle, center + topLeft * unit, unit, screen.Mode);
         }
     }
 
@@ -185,11 +198,11 @@ public sealed partial class ElectionScreenOverlay : Overlay
             if (left < TimeSpan.Zero)
                 left = TimeSpan.Zero;
 
-            Text(handle, origin, unit, scale, Loc.GetString("election-screen-title"), Width / 2f, 18f, Accent, 0.5f);
-            Text(handle, origin, unit, scale, Loc.GetString("election-screen-standby"), Width / 2f, 27f, Ink, 0.5f);
+            Text(handle, origin, unit, scale, Loc.GetString("election-screen-title"), _width / 2f, 18f, Accent, 0.5f);
+            Text(handle, origin, unit, scale, Loc.GetString("election-screen-standby"), _width / 2f, 27f, Ink, 0.5f);
             Text(handle, origin, unit, scale,
                 Loc.GetString("election-screen-standby-timer", ("time", $"{(int) left.TotalMinutes:00}:{left.Seconds:00}")),
-                Width / 2f, 34f, Dim, 0.5f);
+                _width / 2f, 34f, Dim, 0.5f);
             return;
         }
 
@@ -209,19 +222,20 @@ public sealed partial class ElectionScreenOverlay : Overlay
             }
         }
 
-        Text(handle, origin, unit, scale, Loc.GetString("election-screen-title"), 1f, 4.5f, Accent);
-        Text(handle, origin, unit, scale,
-            Loc.GetString("election-screen-sections", ("percent", Percent(state.Sections))),
-            Width - 1f, 4.5f, Ink, 1f);
-        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, Width, 0.5f), Accent);
+        var sections = Loc.GetString("election-screen-sections", ("percent", Percent(state.Sections)));
+        var sectionsWidth = handle.GetDimensions(_font, sections, scale).X / unit;
+        Text(handle, origin, unit, scale, sections, _width - 1f, 4.5f, Ink, 1f);
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-title"), 1f, 4.5f, Accent,
+            maxWidth: _width - sectionsWidth - 4f);
+        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, _width, 0.5f), Accent);
 
         var candidates = state.Candidates;
-        var pages = Math.Max(1, (candidates.Count + RowsPerPage - 1) / RowsPerPage);
+        var pages = Math.Max(1, (candidates.Count + _rows - 1) / _rows);
         var page = mode == ElectionScreenMode.Top3 ? 0 : (int) (_timing.RealTime.TotalSeconds / PageSeconds) % pages;
 
-        for (var i = 0; i < RowsPerPage; i++)
+        for (var i = 0; i < _rows; i++)
         {
-            var index = page * RowsPerPage + i;
+            var index = page * _rows + i;
             if (index >= candidates.Count)
                 break;
 
@@ -239,16 +253,16 @@ public sealed partial class ElectionScreenOverlay : Overlay
 
         if (mode == ElectionScreenMode.Top3)
         {
-            var others = candidates.Skip(RowsPerPage).Sum(c => c.Percent);
-            Text(handle, origin, unit, scale, Loc.GetString("election-screen-others", ("percent", Percent(others))), 1f, FooterBaseline, Dim);
-            Text(handle, origin, unit, scale, status, Width - 1f, FooterBaseline, statusColor, 1f);
+            var others = candidates.Skip(_rows).Sum(c => c.Percent);
+            Text(handle, origin, unit, scale, Loc.GetString("election-screen-others", ("percent", Percent(others))), 1f, _height - 2f, Dim);
+            Text(handle, origin, unit, scale, status, _width - 1f, _height - 2f, statusColor, 1f);
             return;
         }
 
-        Text(handle, origin, unit, scale, status, 1f, FooterBaseline, statusColor);
+        Text(handle, origin, unit, scale, status, 1f, _height - 2f, statusColor);
         Text(handle, origin, unit, scale,
             Loc.GetString("election-screen-page", ("page", page + 1), ("pages", pages)),
-            Width - 1f, FooterBaseline, Dim, 1f);
+            _width - 1f, _height - 2f, Dim, 1f);
     }
 
     private void DrawElected(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, List<ElectionCandidate> candidates)
@@ -256,10 +270,10 @@ public sealed partial class ElectionScreenOverlay : Overlay
         var winner = candidates.Find(c => c.Outcome == ElectionOutcome.Elected) ?? candidates[0];
         var color = PartyColor(winner.Party);
         const float textLeft = 35f;
-        const float textWidth = Width - textLeft - 2f;
+        var textWidth = _width - textLeft - 2f;
 
-        Text(handle, origin, unit, scale, Loc.GetString("election-screen-final-elected"), Width / 2f, 4.5f, Accent, 0.5f);
-        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, Width, 0.5f), Accent);
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-final-elected"), _width / 2f, 4.5f, Accent, 0.5f);
+        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, _width, 0.5f), Accent);
 
         DrawBody(handle, origin, unit, winner, 2f, 8f, 30f);
         Text(handle, origin, unit, scale, winner.Name, textLeft, 13f, Ink, maxWidth: textWidth);
@@ -269,7 +283,7 @@ public sealed partial class ElectionScreenOverlay : Overlay
         handle.DrawRect(Box(origin, unit, textLeft, 30f, textWidth * Math.Clamp(winner.Percent / 100f, 0f, 1f), 2f), color);
         Text(handle, origin, unit, scale, Loc.GetString("election-screen-votes", ("votes", Thousands(winner.Votes))), textLeft, 37f, Dim);
 
-        handle.DrawRect(Box(origin, unit, 0f, 40f, Width, 0.5f), Dim);
+        handle.DrawRect(Box(origin, unit, 0f, _height - FooterHeight - 1f, _width, 0.5f), Dim);
         var others = candidates.Where(c => c != winner).Take(2).ToList();
         for (var i = 0; i < others.Count; i++)
         {
@@ -277,28 +291,28 @@ public sealed partial class ElectionScreenOverlay : Overlay
                 ("rank", i + 2),
                 ("name", others[i].Name),
                 ("percent", Percent(others[i].Percent)));
-            Text(handle, origin, unit, scale, text, i == 0 ? 1f : Width - 1f, FooterBaseline, Dim, i, Width / 2f - 2f);
+            Text(handle, origin, unit, scale, text, i == 0 ? 1f : _width - 1f, _height - 2f, Dim, i, _width / 2f - 2f);
         }
     }
 
     private void DrawVersus(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, ElectionCandidate first, ElectionCandidate second)
     {
-        Text(handle, origin, unit, scale, Loc.GetString("election-screen-final-second-round"), Width / 2f, 4.5f, Accent, 0.5f);
-        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, Width, 0.5f), Accent);
-        Text(handle, origin, unit, scale * 2f, "X", Width / 2f, 23f, Accent, 0.5f);
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-final-second-round"), _width / 2f, 4.5f, Accent, 0.5f);
+        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, _width, 0.5f), Accent);
+        Text(handle, origin, unit, scale * 2f, "X", _width / 2f, 23f, Accent, 0.5f);
 
-        DrawContender(handle, origin, unit, scale, first, Width * 0.25f);
-        DrawContender(handle, origin, unit, scale, second, Width * 0.75f);
+        DrawContender(handle, origin, unit, scale, first, _width * 0.25f);
+        DrawContender(handle, origin, unit, scale, second, _width * 0.75f);
     }
 
     private void DrawContender(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, ElectionCandidate candidate, float x)
     {
         const float size = 24f;
-        const float maxWidth = Width / 2f - 2f;
+        var maxWidth = _width / 2f - 2f;
 
         DrawBody(handle, origin, unit, candidate, x - size / 2f, 7f, size);
         Text(handle, origin, unit, scale, candidate.Name, x, 35f, Ink, 0.5f, maxWidth);
-        Text(handle, origin, unit, scale, candidate.Party, x, 40f, PartyColor(candidate.Party), 0.5f, maxWidth);
+        Text(handle, origin, unit, scale, ShortParty(candidate.Party), x, 40f, PartyColor(candidate.Party), 0.5f, maxWidth);
         Text(handle, origin, unit, scale, Percent(candidate.Percent) + "%", x, 45.5f, Ink, 0.5f, maxWidth);
     }
 
@@ -312,7 +326,7 @@ public sealed partial class ElectionScreenOverlay : Overlay
     {
         var color = PartyColor(candidate.Party);
         var textLeft = PortraitSize + 3f;
-        var barWidth = Width - textLeft - 1f;
+        var barWidth = _width - textLeft - 1f;
 
         handle.DrawRect(Box(origin, unit, textLeft - 1f, y, barWidth + 1f, PortraitSize), color.WithAlpha(0.15f));
         handle.DrawRect(Box(origin, unit, textLeft - 1f, y, (barWidth + 1f) * Math.Clamp(candidate.Percent / 100f, 0f, 1f), PortraitSize),
@@ -328,7 +342,7 @@ public sealed partial class ElectionScreenOverlay : Overlay
         var won = candidate.Outcome != ElectionOutcome.None;
         var percent = Percent(candidate.Percent) + "%";
         var percentWidth = handle.GetDimensions(_font, percent, scale).X / unit;
-        Text(handle, origin, unit, scale, percent, Width - 2f, y + 4f, Ink, 1f);
+        Text(handle, origin, unit, scale, percent, _width - 2f, y + 4f, Ink, 1f);
         Text(handle, origin, unit, scale, candidate.Name, textLeft, y + 4f, won ? Accent : Ink,
             maxWidth: barWidth - percentWidth - 3f);
 
@@ -338,18 +352,20 @@ public sealed partial class ElectionScreenOverlay : Overlay
             ElectionOutcome.SecondRound => Loc.GetString("election-screen-second-round"),
             _ => null,
         };
-        var votes = Loc.GetString("election-screen-votes", ("votes", Thousands(candidate.Votes)));
+        var votes = ShortVotes(candidate.Votes);
+        var party = ShortParty(candidate.Party);
         var votesWidth = handle.GetDimensions(_font, votes, scale).X / unit;
-        Text(handle, origin, unit, scale, votes, Width - 2f, y + 9f, Dim, 1f);
-        Text(handle, origin, unit, scale, tag == null ? candidate.Party : $"{tag} - {candidate.Party}", textLeft, y + 9f,
+        Text(handle, origin, unit, scale, votes, _width - 2f, y + 9f, Dim, 1f);
+        Text(handle, origin, unit, scale, tag == null ? party : $"{tag} - {party}", textLeft, y + 9f,
             won ? Accent : Dim,
             maxWidth: barWidth - votesWidth - 3f);
     }
 
     // anchor: 0 starts at x, 0.5 centers, 1 ends at x
     private void Text(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, string text, float x, float baseline,
-        Color color, float anchor = 0f, float maxWidth = Width)
+        Color color, float anchor = 0f, float maxWidth = float.MaxValue)
     {
+        maxWidth = Math.Min(maxWidth, _width);
         var width = handle.GetDimensions(_font, text, scale).X;
         while (width > maxWidth * unit && text.Length > 1)
         {
@@ -387,6 +403,22 @@ public sealed partial class ElectionScreenOverlay : Overlay
     {
         var hundredths = (int) MathF.Round(value * 100f);
         return $"{hundredths / 100},{hundredths % 100:00}";
+    }
+
+    private static string ShortParty(string party)
+    {
+        return party.StartsWith("Partido ") ? "P. " + party["Partido ".Length..] : party;
+    }
+
+    private static string ShortVotes(long votes)
+    {
+        if (votes >= 1_000_000)
+            return $"{votes / 1_000_000},{votes % 1_000_000 / 100_000} mi";
+
+        if (votes >= 1_000)
+            return $"{votes / 1_000},{votes % 1_000 / 100} mil";
+
+        return votes.ToString();
     }
 
     private static string Thousands(long value)
