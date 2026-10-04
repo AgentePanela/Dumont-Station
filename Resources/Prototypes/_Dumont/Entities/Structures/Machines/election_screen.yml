@@ -1,0 +1,36 @@
+- type: entity
+  parent: BaseMachinePowered
+  id: ElectionScreen
+  name: election screen
+  description: Broadcasts the sector's general election count, live from Central Command.
+  placement:
+    mode: SnapgridCenter
+  components:
+  - type: Sprite
+    sprite: _Dumont/Structures/Machines/election_screen.rsi
+    noRot: true
+    offset: 0,0.5
+    layers:
+    - state: base
+    - state: screen
+      shader: unshaded
+      map: [ "screen" ]
+  - type: Appearance
+  - type: GenericVisualizer
+    visuals:
+      enum.PowerDeviceVisuals.Powered:
+        screen:
+          True: { visible: true }
+          False: { visible: false }
+  - type: ApcPowerReceiver
+    powerLoad: 200
+  - type: ElectionScreen
+
+- type: entity
+  parent: BaseFlatpack
+  id: ElectionScreenFlatpack
+  name: election screen flatpack
+  description: A flatpack used for constructing an election screen.
+  components:
+  - type: Flatpack
+    entity: ElectionScreen

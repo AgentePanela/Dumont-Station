@@ -1,0 +1,402 @@
+using System.Linq;
+using System.Numerics;
+using Content.Client.Lobby;
+using Content.Client.Resources;
+using Content.Shared._Dumont.Election;
+using Content.Shared.Examine;
+using Content.Shared.Power.EntitySystems;
+using Content.Shared.Roles;
+using Robust.Client.GameObjects;
+using Robust.Client.Graphics;
+using Robust.Client.Player;
+using Robust.Client.ResourceManagement;
+using Robust.Client.UserInterface;
+using Robust.Shared.Enums;
+using Robust.Shared.Graphics;
+using Robust.Shared.Prototypes;
+using Robust.Shared.Timing;
+
+namespace Content.Client._Dumont.Election;
+
+public sealed partial class ElectionScreenOverlay : Overlay
+{
+    [Dependency] private IClyde _clyde = default!;
+    [Dependency] private IEntityManager _entMan = default!;
+    [Dependency] private IGameTiming _timing = default!;
+    [Dependency] private IPlayerManager _player = default!;
+    [Dependency] private IPrototypeManager _proto = default!;
+    [Dependency] private IResourceCache _cache = default!;
+    [Dependency] private IUserInterfaceManager _ui = default!;
+
+    private readonly ExamineSystemShared _examine;
+    private readonly SharedPowerReceiverSystem _power;
+    private readonly SharedTransformSystem _xform;
+    private readonly Font _font;
+
+    public override OverlaySpace Space => OverlaySpace.ScreenSpace;
+
+    // everything here is in sprite pixels, from the top left of the lit area
+    private static readonly Vector2 DisplayOrigin = new(-44f, -40f);
+    private const float Width = 88f;
+    private const float HeaderHeight = 6f;
+    private const float RowHeight = 11f;
+    private const float FooterBaseline = 46f;
+    private const float PortraitSize = 10f;
+    private const int RowsPerPage = 3;
+    private const float PageSeconds = 6f;
+    private const float SightRange = 25f;
+    private const int PortraitFrames = 8;
+
+    // where the head sits on a 32x32 mob drawn at double size
+    private static readonly UIBox2 HeadRegion = new(16f, 2f, 48f, 34f);
+
+    // the background comes from the sprite, which is white
+    private static readonly Color Ink = Color.FromHex("#14181f");
+    private static readonly Color Accent = Color.FromHex("#a3541a");
+    private static readonly Color Dim = Color.FromHex("#5a6472");
+
+    private sealed class Portrait
+    {
+        public EntityUid Dummy;
+        public IRenderTexture Target = default!;
+        public int Frames;
+    }
+
+    private readonly Dictionary<string, Portrait> _portraits = new();
+    private ElectionStateEvent? _state;
+
+    public ElectionScreenOverlay()
+    {
+        IoCManager.InjectDependencies(this);
+
+        _examine = _entMan.System<ExamineSystemShared>();
+        _power = _entMan.System<SharedPowerReceiverSystem>();
+        _xform = _entMan.System<SharedTransformSystem>();
+        _font = _cache.GetFont("/Fonts/TinyUnicode.ttf", 16);
+    }
+
+    public void SetState(ElectionStateEvent? state)
+    {
+        _state = state;
+
+        var wanted = state?.Candidates.ToDictionary(Key) ?? new Dictionary<string, ElectionCandidate>();
+        foreach (var (key, portrait) in _portraits.ToList())
+        {
+            if (wanted.ContainsKey(key))
+                continue;
+
+            if (_entMan.EntityExists(portrait.Dummy))
+                _entMan.DeleteEntity(portrait.Dummy);
+
+            portrait.Target.Dispose();
+            _portraits.Remove(key);
+        }
+
+        var lobby = _ui.GetUIController<LobbyUIController>();
+        foreach (var (key, candidate) in wanted)
+        {
+            if (_portraits.ContainsKey(key))
+                continue;
+
+            JobPrototype? job = null;
+            if (candidate.Job != null)
+                _proto.TryIndex(candidate.Job, out job);
+
+            _portraits[key] = new Portrait
+            {
+                Dummy = lobby.LoadProfileEntity(candidate.Profile, job, true),
+                Target = _clyde.CreateRenderTarget(new Vector2i(64, 64),
+                    new RenderTargetFormatParameters(RenderTargetColorFormat.Rgba8Srgb),
+                    new TextureSampleParameters { Filter = false },
+                    "election-portrait"),
+            };
+        }
+    }
+
+    protected override void Draw(in OverlayDrawArgs args)
+    {
+        if (_state == null || args.ViewportControl == null)
+            return;
+
+        var handle = args.ScreenHandle;
+        RenderPortraits(handle);
+
+        var matrix = args.ViewportControl.GetWorldToScreenMatrix();
+        var bounds = args.WorldBounds.Enlarged(3f);
+
+        var query = _entMan.EntityQueryEnumerator<ElectionScreenComponent, TransformComponent>();
+        while (query.MoveNext(out var uid, out var screen, out var xform))
+        {
+            if (xform.MapID != args.MapId)
+                continue;
+
+            var world = _xform.GetWorldPosition(xform);
+            if (!bounds.Contains(world) || !_power.IsPowered(uid) || !CanSee(uid))
+                continue;
+
+            var center = Vector2.Transform(world, matrix);
+            var unit = (Vector2.Transform(world + Vector2.UnitX, matrix) - center).Length() / EyeManager.PixelsPerMeter;
+            DrawScreen(handle, center + DisplayOrigin * unit, unit, screen.Mode);
+        }
+    }
+
+    // the doll takes a few frames to finish dressing, so redraw for a bit before throwing it away
+    private void RenderPortraits(DrawingHandleScreen handle)
+    {
+        foreach (var portrait in _portraits.Values)
+        {
+            if (portrait.Frames >= PortraitFrames)
+                continue;
+
+            var dummy = portrait.Dummy;
+            if (_entMan.HasComponent<SpriteComponent>(dummy))
+            {
+                var target = portrait.Target;
+                handle.RenderInRenderTarget(target,
+                    () => handle.DrawEntity(dummy, target.Size / 2, new Vector2(2f, 2f), Angle.Zero, Angle.Zero, Direction.South),
+                    Color.Transparent);
+            }
+
+            portrait.Frames++;
+            if (portrait.Frames >= PortraitFrames && _entMan.EntityExists(dummy))
+                _entMan.DeleteEntity(dummy);
+        }
+    }
+
+    private bool CanSee(EntityUid screen)
+    {
+        if (_player.LocalEntity is not { } local)
+            return true;
+
+        if (_entMan.TryGetComponent<EyeComponent>(local, out var eye) && !eye.DrawFov)
+            return true;
+
+        return _examine.InRangeUnOccluded(local, screen, SightRange);
+    }
+
+    private void DrawScreen(DrawingHandleScreen handle, Vector2 origin, float unit, ElectionScreenMode mode)
+    {
+        var state = _state!;
+        var scale = unit / 2f;
+
+        if (state.Phase == ElectionPhase.Standby)
+        {
+            var left = state.StartsAt - _timing.CurTime;
+            if (left < TimeSpan.Zero)
+                left = TimeSpan.Zero;
+
+            Text(handle, origin, unit, scale, Loc.GetString("election-screen-title"), Width / 2f, 18f, Accent, 0.5f);
+            Text(handle, origin, unit, scale, Loc.GetString("election-screen-standby"), Width / 2f, 27f, Ink, 0.5f);
+            Text(handle, origin, unit, scale,
+                Loc.GetString("election-screen-standby-timer", ("time", $"{(int) left.TotalMinutes:00}:{left.Seconds:00}")),
+                Width / 2f, 34f, Dim, 0.5f);
+            return;
+        }
+
+        if (state.Phase == ElectionPhase.Elected && state.Candidates.Count > 0)
+        {
+            DrawElected(handle, origin, unit, scale, state.Candidates);
+            return;
+        }
+
+        if (state.Phase == ElectionPhase.SecondRound)
+        {
+            var runoff = state.Candidates.Where(c => c.Outcome == ElectionOutcome.SecondRound).ToList();
+            if (runoff.Count >= 2)
+            {
+                DrawVersus(handle, origin, unit, scale, runoff[0], runoff[1]);
+                return;
+            }
+        }
+
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-title"), 1f, 4.5f, Accent);
+        Text(handle, origin, unit, scale,
+            Loc.GetString("election-screen-sections", ("percent", Percent(state.Sections))),
+            Width - 1f, 4.5f, Ink, 1f);
+        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, Width, 0.5f), Accent);
+
+        var candidates = state.Candidates;
+        var pages = Math.Max(1, (candidates.Count + RowsPerPage - 1) / RowsPerPage);
+        var page = mode == ElectionScreenMode.Top3 ? 0 : (int) (_timing.RealTime.TotalSeconds / PageSeconds) % pages;
+
+        for (var i = 0; i < RowsPerPage; i++)
+        {
+            var index = page * RowsPerPage + i;
+            if (index >= candidates.Count)
+                break;
+
+            DrawRow(handle, origin, unit, scale, candidates[index], HeaderHeight + 1f + i * RowHeight);
+        }
+
+        var status = state.Phase switch
+        {
+            ElectionPhase.Waiting => Loc.GetString("election-screen-waiting"),
+            ElectionPhase.SecondRound => Loc.GetString("election-screen-status-second-round"),
+            ElectionPhase.Elected => Loc.GetString("election-screen-status-elected"),
+            _ => Loc.GetString("election-screen-updated", ("time", state.LastUpdate)),
+        };
+        var statusColor = state.Phase is ElectionPhase.SecondRound or ElectionPhase.Elected ? Accent : Dim;
+
+        if (mode == ElectionScreenMode.Top3)
+        {
+            var others = candidates.Skip(RowsPerPage).Sum(c => c.Percent);
+            Text(handle, origin, unit, scale, Loc.GetString("election-screen-others", ("percent", Percent(others))), 1f, FooterBaseline, Dim);
+            Text(handle, origin, unit, scale, status, Width - 1f, FooterBaseline, statusColor, 1f);
+            return;
+        }
+
+        Text(handle, origin, unit, scale, status, 1f, FooterBaseline, statusColor);
+        Text(handle, origin, unit, scale,
+            Loc.GetString("election-screen-page", ("page", page + 1), ("pages", pages)),
+            Width - 1f, FooterBaseline, Dim, 1f);
+    }
+
+    private void DrawElected(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, List<ElectionCandidate> candidates)
+    {
+        var winner = candidates.Find(c => c.Outcome == ElectionOutcome.Elected) ?? candidates[0];
+        var color = PartyColor(winner.Party);
+        const float textLeft = 35f;
+        const float textWidth = Width - textLeft - 2f;
+
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-final-elected"), Width / 2f, 4.5f, Accent, 0.5f);
+        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, Width, 0.5f), Accent);
+
+        DrawBody(handle, origin, unit, winner, 2f, 8f, 30f);
+        Text(handle, origin, unit, scale, winner.Name, textLeft, 13f, Ink, maxWidth: textWidth);
+        Text(handle, origin, unit, scale, winner.Party, textLeft, 18f, Dim, maxWidth: textWidth);
+        Text(handle, origin, unit, scale * 2f, Percent(winner.Percent) + "%", textLeft, 28f, Accent);
+        handle.DrawRect(Box(origin, unit, textLeft, 30f, textWidth, 2f), color.WithAlpha(0.15f));
+        handle.DrawRect(Box(origin, unit, textLeft, 30f, textWidth * Math.Clamp(winner.Percent / 100f, 0f, 1f), 2f), color);
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-votes", ("votes", Thousands(winner.Votes))), textLeft, 37f, Dim);
+
+        handle.DrawRect(Box(origin, unit, 0f, 40f, Width, 0.5f), Dim);
+        var others = candidates.Where(c => c != winner).Take(2).ToList();
+        for (var i = 0; i < others.Count; i++)
+        {
+            var text = Loc.GetString("election-screen-rank",
+                ("rank", i + 2),
+                ("name", others[i].Name),
+                ("percent", Percent(others[i].Percent)));
+            Text(handle, origin, unit, scale, text, i == 0 ? 1f : Width - 1f, FooterBaseline, Dim, i, Width / 2f - 2f);
+        }
+    }
+
+    private void DrawVersus(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, ElectionCandidate first, ElectionCandidate second)
+    {
+        Text(handle, origin, unit, scale, Loc.GetString("election-screen-final-second-round"), Width / 2f, 4.5f, Accent, 0.5f);
+        handle.DrawRect(Box(origin, unit, 0f, HeaderHeight, Width, 0.5f), Accent);
+        Text(handle, origin, unit, scale * 2f, "X", Width / 2f, 23f, Accent, 0.5f);
+
+        DrawContender(handle, origin, unit, scale, first, Width * 0.25f);
+        DrawContender(handle, origin, unit, scale, second, Width * 0.75f);
+    }
+
+    private void DrawContender(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, ElectionCandidate candidate, float x)
+    {
+        const float size = 24f;
+        const float maxWidth = Width / 2f - 2f;
+
+        DrawBody(handle, origin, unit, candidate, x - size / 2f, 7f, size);
+        Text(handle, origin, unit, scale, candidate.Name, x, 35f, Ink, 0.5f, maxWidth);
+        Text(handle, origin, unit, scale, candidate.Party, x, 40f, PartyColor(candidate.Party), 0.5f, maxWidth);
+        Text(handle, origin, unit, scale, Percent(candidate.Percent) + "%", x, 45.5f, Ink, 0.5f, maxWidth);
+    }
+
+    private void DrawBody(DrawingHandleScreen handle, Vector2 origin, float unit, ElectionCandidate candidate, float x, float y, float size)
+    {
+        if (_portraits.TryGetValue(Key(candidate), out var portrait))
+            handle.DrawTextureRect(portrait.Target.Texture, Box(origin, unit, x, y, size, size));
+    }
+
+    private void DrawRow(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, ElectionCandidate candidate, float y)
+    {
+        var color = PartyColor(candidate.Party);
+        var textLeft = PortraitSize + 3f;
+        var barWidth = Width - textLeft - 1f;
+
+        handle.DrawRect(Box(origin, unit, textLeft - 1f, y, barWidth + 1f, PortraitSize), color.WithAlpha(0.15f));
+        handle.DrawRect(Box(origin, unit, textLeft - 1f, y, (barWidth + 1f) * Math.Clamp(candidate.Percent / 100f, 0f, 1f), PortraitSize),
+            color.WithAlpha(0.45f));
+
+        if (_portraits.TryGetValue(Key(candidate), out var portrait))
+        {
+            handle.DrawTextureRectRegion(portrait.Target.Texture,
+                Box(origin, unit, 1f, y, PortraitSize, PortraitSize),
+                HeadRegion);
+        }
+
+        var won = candidate.Outcome != ElectionOutcome.None;
+        var percent = Percent(candidate.Percent) + "%";
+        var percentWidth = handle.GetDimensions(_font, percent, scale).X / unit;
+        Text(handle, origin, unit, scale, percent, Width - 2f, y + 4f, Ink, 1f);
+        Text(handle, origin, unit, scale, candidate.Name, textLeft, y + 4f, won ? Accent : Ink,
+            maxWidth: barWidth - percentWidth - 3f);
+
+        var tag = candidate.Outcome switch
+        {
+            ElectionOutcome.Elected => Loc.GetString("election-screen-elected"),
+            ElectionOutcome.SecondRound => Loc.GetString("election-screen-second-round"),
+            _ => null,
+        };
+        var votes = Loc.GetString("election-screen-votes", ("votes", Thousands(candidate.Votes)));
+        var votesWidth = handle.GetDimensions(_font, votes, scale).X / unit;
+        Text(handle, origin, unit, scale, votes, Width - 2f, y + 9f, Dim, 1f);
+        Text(handle, origin, unit, scale, tag == null ? candidate.Party : $"{tag} - {candidate.Party}", textLeft, y + 9f,
+            won ? Accent : Dim,
+            maxWidth: barWidth - votesWidth - 3f);
+    }
+
+    // anchor: 0 starts at x, 0.5 centers, 1 ends at x
+    private void Text(DrawingHandleScreen handle, Vector2 origin, float unit, float scale, string text, float x, float baseline,
+        Color color, float anchor = 0f, float maxWidth = Width)
+    {
+        var width = handle.GetDimensions(_font, text, scale).X;
+        while (width > maxWidth * unit && text.Length > 1)
+        {
+            text = text[..^1];
+            width = handle.GetDimensions(_font, text, scale).X;
+        }
+
+        var pos = origin + new Vector2(x * unit - width * anchor, baseline * unit - _font.GetAscent(scale));
+        handle.DrawString(_font, pos, text, scale, color);
+    }
+
+    private static UIBox2 Box(Vector2 origin, float unit, float x, float y, float width, float height)
+    {
+        return UIBox2.FromDimensions(origin + new Vector2(x, y) * unit, new Vector2(width, height) * unit);
+    }
+
+    private static string Key(ElectionCandidate candidate)
+    {
+        return $"{candidate.Name}|{candidate.Job}";
+    }
+
+    // has to give the same hue on every client
+    private static Color PartyColor(string party)
+    {
+        var hash = 2166136261u;
+        foreach (var c in party)
+        {
+            hash = (hash ^ c) * 16777619u;
+        }
+
+        return Color.FromHsl(new Vector4(hash % 360u / 360f, 0.7f, 0.5f, 1f));
+    }
+
+    private static string Percent(float value)
+    {
+        var hundredths = (int) MathF.Round(value * 100f);
+        return $"{hundredths / 100},{hundredths % 100:00}";
+    }
+
+    private static string Thousands(long value)
+    {
+        var text = value.ToString();
+        for (var i = text.Length - 3; i > 0; i -= 3)
+        {
+            text = text.Insert(i, ".");
+        }
+
+        return text;
+    }
+}
