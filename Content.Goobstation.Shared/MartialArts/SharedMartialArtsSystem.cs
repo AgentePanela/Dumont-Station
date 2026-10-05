@@ -316,11 +316,9 @@ public abstract partial class SharedMartialArtsSystem : EntitySystem
         return new()
         {
             Coefficients = specifier.DamageDict
-                .Select(x => KeyValuePair.Create(x.Key, multiplier))
-                .ToDictionary(),
+                .ToDictionary(x => (ProtoId<DamageTypePrototype>) x.Key, _ => multiplier),
             FlatReduction = specifier.DamageDict
-                .Select(x => KeyValuePair.Create(x.Key, -modifier)) // Minus mod because it subtracts values from damage
-                .ToDictionary(),
+                .ToDictionary(x => (ProtoId<DamageTypePrototype>) x.Key, _ => -modifier), // Minus mod because it subtracts values from damage
         };
     }
 
