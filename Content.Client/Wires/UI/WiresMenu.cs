@@ -452,6 +452,7 @@ namespace Content.Client.Wires.UI
                     }
 
                     handle.DrawTextureRect(tex, rect, colorValue);
+                    handle.SetTransform(origHandleT);
                 }
             }
         }

@@ -25,8 +25,6 @@ public sealed partial class FloorOcclusionSystem : SharedFloorOcclusionSystem
     {
         base.Initialize();
 
-        _spriteQuery = GetEntityQuery<SpriteComponent>();
-
         SubscribeLocalEvent<FloorOcclusionComponent, ComponentStartup>(OnOcclusionStartup);
         SubscribeLocalEvent<FloorOcclusionComponent, ComponentShutdown>(OnOcclusionShutdown);
         SubscribeLocalEvent<FloorOcclusionComponent, AfterAutoHandleStateEvent>(OnOcclusionAuto);
