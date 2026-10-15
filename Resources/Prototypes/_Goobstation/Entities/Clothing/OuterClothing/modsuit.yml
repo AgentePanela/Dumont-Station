@@ -43,13 +43,12 @@
   - type: Tag
     tags:
     - PlasmamanSafe
-    - SyringeArmor
   - type: IgniteFromGasImmunity
     parts:
     - BodyMiddle
     - Legs
   # GabyStation begin
-  - type: UpgradeableWeapon # Gaby Modulos pra modsuit usam o mesmo sistema ja definido para upgrades de PKA
+  - type: ItemUpgradeable # Gaby Modulos pra modsuit usam o mesmo sistema ja definido para upgrades de PKA
   - type: ContainerContainer
     containers:
       chest_module: !type:ContainerSlot
