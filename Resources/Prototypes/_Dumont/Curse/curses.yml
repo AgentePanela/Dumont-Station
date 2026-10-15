@@ -1,38 +1,38 @@
-- type: curse
+- type: masonCurse
   id: CurseNothing
   weight: 40
 
-- type: curse
+- type: masonCurse
   id: CurseCavityBomb
   weight: 10
   components:
   - type: CurseCavityBomb
 
-- type: curse
+- type: masonCurse
   id: CurseKillSign
   weight: 10
   components:
   - type: KillSign
 
-- type: curse
+- type: masonCurse
   id: CurseRandomIgnite
   weight: 10
   components:
   - type: CurseRandomIgnite
 
-- type: curse
+- type: masonCurse
   id: CurseDropItem
   weight: 10
   components:
   - type: CurseDropItem
 
-- type: curse
+- type: masonCurse
   id: CurseRandomSlip
   weight: 10
   components:
   - type: CurseRandomSlip
 
-- type: curse
+- type: masonCurse
   id: CurseRandomTeleport
   weight: 10
   components:
@@ -42,19 +42,19 @@
       max: 8
 
 # speech curses split the weight of one curse between them
-- type: curse
+- type: masonCurse
   id: CurseBackwardsSpeech
   weight: 3.34
   components:
   - type: BackwardsAccent
 
-- type: curse
+- type: masonCurse
   id: CurseOwOSpeech
   weight: 3.33
   components:
   - type: OwOAccent
 
-- type: curse
+- type: masonCurse
   id: CurseScrambledSpeech
   weight: 3.33
   components:

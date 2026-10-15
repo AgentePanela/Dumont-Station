@@ -7,5 +7,5 @@ namespace Content.Shared._Dumont.Curse;
 public sealed partial class CursedComponent : Component
 {
     [DataField, AutoNetworkedField]
-    public List<ProtoId<CursePrototype>> Curses = new();
+    public List<ProtoId<MasonCursePrototype>> Curses = new();
 }

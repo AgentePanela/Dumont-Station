@@ -86,7 +86,7 @@ public sealed class CurseSystem : EntitySystem
         if (curse.Components.Count == 0)
             return;
 
-        var curses = new List<ProtoId<CursePrototype>> { curse.ID };
+        var curses = new List<ProtoId<MasonCursePrototype>> { curse.ID };
         if (_random.Prob(_doubleChance) && PickCurse(curses) is { } extra)
         {
             curses.Add(extra.ID);
@@ -131,9 +131,9 @@ public sealed class CurseSystem : EntitySystem
     /// <summary>
     /// Picks a weighted curse. With <paramref name="exclude"/>, only real curses not in it can be picked.
     /// </summary>
-    private CursePrototype? PickCurse(ICollection<ProtoId<CursePrototype>>? exclude = null)
+    private MasonCursePrototype? PickCurse(ICollection<ProtoId<MasonCursePrototype>>? exclude = null)
     {
-        var curses = _proto.EnumeratePrototypes<CursePrototype>()
+        var curses = _proto.EnumeratePrototypes<MasonCursePrototype>()
             .Where(c => exclude == null || c.Components.Count > 0 && !exclude.Contains(c.ID))
             .ToList();
 
