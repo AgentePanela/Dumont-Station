@@ -2,6 +2,7 @@ curse-subtle-popup = Você escuta uma voz na sua cabeça...
 curse-subtle-message = Agora você está amaldiçoado.
 curse-bomb-popup = Você sente algo tiquetaqueando dentro do seu peito...
 curse-ignite-popup = Você sente um calor estranho subindo pelo corpo!
+curse-drop-popup = {CAPITALIZE(THE($item))} escorrega da sua mão!
 curse-removed-popup = Você sente um peso enorme saindo dos seus ombros.
 
 reagent-name-masonlina = masonlina

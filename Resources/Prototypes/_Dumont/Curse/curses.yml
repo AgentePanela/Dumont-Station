@@ -4,18 +4,58 @@
 
 - type: curse
   id: CurseCavityBomb
-  weight: 20
+  weight: 10
   components:
   - type: CurseCavityBomb
 
 - type: curse
   id: CurseKillSign
-  weight: 20
+  weight: 10
   components:
   - type: KillSign
 
 - type: curse
   id: CurseRandomIgnite
-  weight: 20
+  weight: 10
   components:
   - type: CurseRandomIgnite
+
+- type: curse
+  id: CurseDropItem
+  weight: 10
+  components:
+  - type: CurseDropItem
+
+- type: curse
+  id: CurseRandomSlip
+  weight: 10
+  components:
+  - type: CurseRandomSlip
+
+- type: curse
+  id: CurseRandomTeleport
+  weight: 10
+  components:
+  - type: CurseRandomTeleport
+    radius:
+      min: 3
+      max: 8
+
+# speech curses split the weight of one curse between them
+- type: curse
+  id: CurseBackwardsSpeech
+  weight: 3.34
+  components:
+  - type: BackwardsAccent
+
+- type: curse
+  id: CurseOwOSpeech
+  weight: 3.33
+  components:
+  - type: OwOAccent
+
+- type: curse
+  id: CurseScrambledSpeech
+  weight: 3.33
+  components:
+  - type: ScrambledAccent
