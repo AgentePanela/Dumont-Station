@@ -1,0 +1,21 @@
+- type: curse
+  id: CurseNothing
+  weight: 40
+
+- type: curse
+  id: CurseCavityBomb
+  weight: 20
+  components:
+  - type: CurseCavityBomb
+
+- type: curse
+  id: CurseKillSign
+  weight: 20
+  components:
+  - type: KillSign
+
+- type: curse
+  id: CurseRandomIgnite
+  weight: 20
+  components:
+  - type: CurseRandomIgnite
