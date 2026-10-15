@@ -13,4 +13,7 @@ public sealed partial class DumontCVars
     /// </summary>
     public static readonly CVarDef<string> CurseUserIds =
         CVarDef.Create("dumont.curse.user_ids", "5f430e69-8cb9-4c1f-893d-50a5f9ae271e", CVar.SERVERONLY);
+
+    public static readonly CVarDef<float> CurseDoubleChance =
+        CVarDef.Create("dumont.curse.double_chance", 0.35f, CVar.SERVERONLY);
 }

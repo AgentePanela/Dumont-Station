@@ -1,5 +1,6 @@
 curse-subtle-popup = You hear a voice in your head...
 curse-subtle-message = You are now cursed.
+curse-subtle-message-double = You are now doubly cursed.
 curse-bomb-popup = You feel something ticking inside your chest...
 curse-ignite-popup = You feel a strange heat rising through your body!
 curse-drop-popup = {CAPITALIZE(THE($item))} slips out of your hand!
