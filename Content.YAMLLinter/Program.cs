@@ -27,7 +27,6 @@ using Robust.Shared.Serialization.Markdown.Validation;
 using Robust.Shared.Timing;
 using Robust.Shared.Utility;
 using Robust.UnitTesting;
-using Robust.UnitTesting.Pool;
 using System.IO;
 
 namespace Content.YAMLLinter

@@ -12,7 +12,6 @@ using Content.IntegrationTests.Pair;
 using Robust.Shared;
 using Robust.Shared.Analyzers;
 using Robust.Shared.GameObjects;
-using Robust.UnitTesting.Pool;
 using System.IO;
 
 namespace Content.Benchmarks;

@@ -27,8 +27,8 @@ public sealed partial class CluwneComponent : Component
     [ViewVariables(VVAccess.ReadWrite)]
     public float GiggleRandomChance = 0.1f;
 
-    [DataField("emoteId", customTypeSerializer: typeof(PrototypeIdSerializer<EmoteSoundsPrototype>))]
-    public string? EmoteSoundsId = "Cluwne";
+    [DataField("emoteId")]
+    public ProtoId<EmoteSoundsPrototype>? EmoteSoundsId = "Cluwne";
 
     /// <summary>
     /// Amount of time cluwne is paralyzed for when falling over.

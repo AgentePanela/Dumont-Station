@@ -285,8 +285,8 @@ public sealed partial class ZombieComponent : Component
     /// <summary>
     /// The blood reagent to give the zombie. In case you want zombies that bleed milk, or something.
     /// </summary>
-    [DataField("newBloodReagent", customTypeSerializer: typeof(PrototypeIdSerializer<ReagentPrototype>))]
-    public string NewBloodReagent = "ZombieBlood";
+    [DataField("newBloodReagent")]
+    public ProtoId<ReagentPrototype> NewBloodReagent = "ZombieBlood";
 
     [DataField]
     public EntityUid? BeforeZombificationReferenceEnt; // Goob - reference clone of before zombified
